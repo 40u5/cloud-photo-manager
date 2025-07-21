@@ -1,9 +1,9 @@
 {
   "name": "free-cloud-photos-server",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "server.ts",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.ts"
   },
   "dependencies": {
     "express": "^4.21.2"

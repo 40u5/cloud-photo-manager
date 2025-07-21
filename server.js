@@ -1,6 +1,10 @@
-const express = require('express');
+import express from 'express';
+import path from 'path';
+
 const app = express();
 const PORT = 3000;
+
+app.use(express.json());
 
 app.get('/', (req, res) => {
   res.send('Hello, world!');
@@ -8,4 +12,4 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-}); 
+});
