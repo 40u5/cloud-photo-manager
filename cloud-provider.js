@@ -1,12 +1,12 @@
 export default class CloudProvider {
-  constructor(apiKey) {
+  constructor(accessToken) {
     if (new.target === CloudProvider) {
       throw new TypeError('Cannot instantiate abstract class CloudProvider directly');
     }
-    this.apiKey = apiKey;
+    this.accessToken = accessToken;
   }
 
   getStorage() {
-    throw new Error("not implemented in subclass")
+    throw new Error("getStorage Not Implemented In Subclass")
   }
 }
