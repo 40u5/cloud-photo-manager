@@ -7,6 +7,10 @@ class DropboxProvider extends CloudProvider {
     this.dbx = new Dropbox({ accessToken: accessToken });
   }
 
+  getToken() {
+    
+  }
+
   async getStorage() {
     try {
       const res = await this.dbx.usersGetSpaceUsage();
