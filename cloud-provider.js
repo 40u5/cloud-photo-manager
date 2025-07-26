@@ -1,9 +1,8 @@
 export default class CloudProvider {
-  constructor(accessToken) {
+  constructor() {
     if (new.target === CloudProvider) {
       throw new TypeError('Cannot instantiate abstract class CloudProvider directly');
     }
-    this.accessToken = accessToken;
   }
 
   getStorage() {

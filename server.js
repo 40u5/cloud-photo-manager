@@ -28,15 +28,14 @@ app.get('/', (req, res) => {
   `);
 });
 
-
 app.get('/photos', async (req, res) => {
-  let accessToken = process.env.DROPBOX_ACCESS_TOKEN;
+  let accessToken = process.env.DROPBOX_ACCESS_TOKEN_1;
   
   // If no access token, try to refresh it
-  if (!accessToken && process.env.DROPBOX_REFRESH_TOKEN) {
+  if (!accessToken && process.env.DROPBOX_REFRESH_TOKEN_1) {
     try {
       await axios.post(`http://localhost:${PORT}/auth/refresh`);
-      accessToken = process.env.DROPBOX_ACCESS_TOKEN;
+      accessToken = process.env.DROPBOX_ACCESS_TOKEN_1;
     } catch (error) {
       console.error('Failed to refresh token:', error.message);
     }
@@ -55,10 +54,10 @@ app.get('/photos', async (req, res) => {
     res.json(files);
   } catch (err) {
     // If token is expired, try to refresh and retry
-    if (err.message.includes('invalid_access_token') && process.env.DROPBOX_REFRESH_TOKEN) {
+    if (err.message.includes('invalid_access_token') && process.env.DROPBOX_REFRESH_TOKEN_1) {
       try {
         await axios.post(`http://localhost:${PORT}/auth/refresh`);
-        const newProvider = new DropboxProvider(process.env.DROPBOX_ACCESS_TOKEN);
+        const newProvider = new DropboxProvider(process.env.DROPBOX_ACCESS_TOKEN_1);
         const files = await newProvider.listFiles('');
         res.json(files);
       } catch (refreshError) {

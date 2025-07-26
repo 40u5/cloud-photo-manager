@@ -9,10 +9,10 @@ const router = express.Router();
 
 // Step 1: Redirect to Dropbox with callback URL
 router.get('/auth/dropbox', (req, res) => {
-  const APP_KEY = process.env.APP_KEY;
+  const APP_KEY = process.env.DROPBOX_APP_KEY_1;
   
   if (!APP_KEY) {
-    return res.status(500).json({ error: 'APP_KEY not configured in environment variables' });
+    return res.status(500).json({ error: 'DROPBOX_APP_KEY_1 not configured in environment variables' });
   }
   
   // Include redirect_uri for automatic callback
@@ -66,12 +66,12 @@ router.get('/', async (req, res) => {
   }
   
   try {
-    const APP_KEY = process.env.APP_KEY;
-    const APP_SECRET = process.env.APP_SECRET;
+    const APP_KEY = process.env.DROPBOX_APP_KEY_1;
+    const APP_SECRET = process.env.DROPBOX_APP_SECRET_1;
     const redirectUri = `${req.protocol}://${req.get('host')}/`;
     
     if (!APP_KEY || !APP_SECRET) {
-      return res.status(500).json({ error: 'APP_KEY or APP_SECRET not configured' });
+      return res.status(500).json({ error: 'DROPBOX_APP_KEY_1 or DROPBOX_APP_SECRET_1 not configured' });
     }
     
     // Exchange code for tokens (include redirect_uri since we used it)
@@ -94,13 +94,13 @@ router.get('/', async (req, res) => {
     
     // Update .env file
     await updateEnvFile({
-      DROPBOX_ACCESS_TOKEN: access_token,
-      DROPBOX_REFRESH_TOKEN: refresh_token
+      DROPBOX_ACCESS_TOKEN_1: access_token,
+      DROPBOX_REFRESH_TOKEN_1: refresh_token
     });
     
     // Update process.env for current session
-    process.env.DROPBOX_ACCESS_TOKEN = access_token;
-    process.env.DROPBOX_REFRESH_TOKEN = refresh_token;
+    process.env.DROPBOX_ACCESS_TOKEN_1 = access_token;
+    process.env.DROPBOX_REFRESH_TOKEN_1 = refresh_token;
     
     res.send(`
       <html>
@@ -174,9 +174,9 @@ async function updateEnvFile(newVars) {
 // Endpoint to refresh access token
 router.post('/auth/refresh', async (req, res) => {
   try {
-    const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
-    const APP_KEY = process.env.APP_KEY;
-    const APP_SECRET = process.env.APP_SECRET;
+    const refreshToken = process.env.DROPBOX_REFRESH_TOKEN_1;
+    const APP_KEY = process.env.DROPBOX_APP_KEY_1;
+    const APP_SECRET = process.env.DROPBOX_APP_SECRET_1;
     
     if (!refreshToken || !APP_KEY || !APP_SECRET) {
       return res.status(400).json({ error: 'Missing required environment variables' });
@@ -200,11 +200,11 @@ router.post('/auth/refresh', async (req, res) => {
     
     // Update .env file with new access token
     await updateEnvFile({
-      DROPBOX_ACCESS_TOKEN: access_token
+      DROPBOX_ACCESS_TOKEN_1: access_token
     });
     
     // Update process.env for current session
-    process.env.DROPBOX_ACCESS_TOKEN = access_token;
+    process.env.DROPBOX_ACCESS_TOKEN_1 = access_token;
     
     res.json({
       message: 'Access token refreshed successfully',

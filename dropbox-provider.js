@@ -1,14 +1,86 @@
 import CloudProvider from './cloud-provider.js';
 import { Dropbox } from 'dropbox';
+import fs from 'fs';
+import path from 'path';
 
 class DropboxProvider extends CloudProvider {
-  constructor(accessToken) {
-    super(accessToken);
-    this.dbx = new Dropbox({ accessToken: accessToken });
+  constructor(authenticated) {
+    this.dbx = new Dropbox();
+    this.authenticated = authenticated;
   }
 
-  getToken() {
-    
+  /**
+   * Authenticate the provider using environment variables for a specific instance
+   * @param {number} instanceIndex - The instance index (0-based)
+   * @returns {boolean} - True if authentication was successful, false otherwise
+   */
+  addCredentials(instanceIndex) {
+    try {
+      // Get credentials from environment variables for the specific instance
+      const appKey = process.env[`DROPBOX_APP_KEY_${instanceIndex}`];
+      const appSecret = process.env[`DROPBOX_APP_SECRET_${instanceIndex}`];
+      const accessToken = process.env[`DROPBOX_ACCESS_TOKEN_${instanceIndex}`];
+      const refreshToken = process.env[`DROPBOX_REFRESH_TOKEN_${instanceIndex}`];
+
+      // Check if we have the required authentication credentials
+      if (!accessToken || !refreshToken || !appKey || !appSecret) {
+        console.log(`Missing authentication credentials for Dropbox instance ${instanceIndex}`);
+        this.authenticated = false;
+        return false;
+      }
+
+      // Configure the Dropbox instance with credentials
+      this.dbx.setAccessToken(accessToken);
+      this.dbx.setRefreshToken(refreshToken);
+      this.dbx.setClientId(appKey);
+      this.dbx.setClientSecret(appSecret);
+
+      this.authenticated = true;
+      console.log(`Successfully authenticated Dropbox provider instance ${instanceIndex}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to authenticate Dropbox provider instance ${instanceIndex}:`, error.message);
+      this.authenticated = false;
+      return false;
+    }
+  }
+
+  /**
+   * Write credentials to .env file for a specific instance
+   * @param {number} instanceIndex - The instance index to write credentials for
+   */
+  writeEnvVariables(instanceIndex = 0, credentials) {
+    try {
+      // Get credentials from the provided object
+      const appKey = credentials.appKey;
+      const appSecret = credentials.appSecret;
+      const accessToken = credentials.accessToken;
+      const refreshToken = credentials.refreshToken;
+      
+      if (!appKey || !appSecret || !accessToken || !refreshToken) {
+        throw new Error(`Missing credentials for Dropbox instance ${instanceIndex}`);
+      }
+      
+      // Prepare the environment variables to write
+      const envContent = [
+        `DROPBOX_APP_KEY_${instanceIndex}=${appKey}`,
+        `DROPBOX_APP_SECRET_${instanceIndex}=${appSecret}`,
+        `DROPBOX_ACCESS_TOKEN_${instanceIndex}=${accessToken}`,
+        `DROPBOX_REFRESH_TOKEN_${instanceIndex}=${refreshToken}`,
+        ''
+      ].join('\n');
+      
+      // Write to .env file (always append, don't check for previous instance)
+      const envPath = path.join(process.cwd(), '.env');
+      let existingContent = '';
+      if (fs.existsSync(envPath)) {
+        existingContent = fs.readFileSync(envPath, 'utf8');
+      }
+      const newContent = existingContent + (existingContent ? '\n' : '') + envContent;
+      fs.writeFileSync(envPath, newContent);
+    } catch (error) {
+      throw error;
+    }
   }
 
   async getStorage() {
