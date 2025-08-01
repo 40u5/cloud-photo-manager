@@ -1,5 +1,7 @@
 import CloudProvider from './cloud-provider.js';
 import { Dropbox, DropboxAuth } from 'dropbox';
+import axios from 'axios';
+import EnvFileManager from './env-file-manager.js';
 
 class DropboxProvider extends CloudProvider {
   constructor(authenticated) {
@@ -58,6 +60,101 @@ class DropboxProvider extends CloudProvider {
     }
   }
 
+  /**
+   * Refresh the access token using the refresh token
+   * @param {Object} credentials - The credentials object containing appKey, appSecret, refreshToken
+   * @param {number} instanceIndex - The instance index for environment variable updates
+   * @returns {Object} - Object containing success status and new access token
+   */
+  async refreshToken(credentials, instanceIndex) {
+    try {
+      const { appKey, appSecret, refreshToken } = credentials;
+      
+      if (!refreshToken || !appKey || !appSecret) {
+        throw new Error('Missing required credentials for token refresh');
+      }
+
+      // Make API call to refresh the access token
+      const response = await axios.post('https://api.dropboxapi.com/oauth2/token', 
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: appKey,
+          client_secret: appSecret
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      const { access_token, refresh_token } = response.data;
+      
+      // Update the Dropbox instance with new access token
+      const auth = new DropboxAuth({
+        clientId: appKey,
+        clientSecret: appSecret,
+        accessToken: access_token,
+        refreshToken: refresh_token || refreshToken // Use new refresh token if provided, otherwise keep existing
+      });
+      
+      this.dbx = new Dropbox({ auth });
+      this.authenticated = true;
+
+      // Update environment variables with new tokens
+      const envManager = new EnvFileManager();
+      const patterns = this.getEnvVariablePatterns(instanceIndex);
+      
+      const edits = [
+        {
+          pattern: `^${patterns.accessToken}=`,
+          newValue: access_token
+        }
+      ];
+      
+      // Only update refresh token if a new one was provided
+      if (refresh_token) {
+        edits.push({
+          pattern: `^${patterns.refreshToken}=`,
+          newValue: refresh_token
+        });
+      }
+      
+      envManager.editLines(edits);
+      
+      // Update process.env for current session
+      process.env[patterns.accessToken] = access_token;
+      if (refresh_token) {
+        process.env[patterns.refreshToken] = refresh_token;
+      }
+
+      console.log('Successfully refreshed Dropbox access token');
+      
+      return {
+        success: true,
+        accessToken: access_token,
+        refreshToken: refresh_token || refreshToken,
+        message: 'Access token refreshed successfully'
+      };
+      
+    } catch (error) {
+      console.error('Failed to refresh Dropbox access token:', error.response?.data || error.message);
+      
+      let errorMessage = 'Failed to refresh access token';
+      if (error.response?.data?.error === 'invalid_grant') {
+        errorMessage = 'Refresh token is invalid or expired. Re-authentication required.';
+      } else if (error.response?.data?.error === 'invalid_client') {
+        errorMessage = 'Invalid client credentials.';
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        details: error.response?.data?.error_description || error.message
+      };
+    }
+  }
 
 
   async getStorage() {
@@ -187,6 +284,19 @@ class DropboxProvider extends CloudProvider {
       };
     } catch (err) {
       throw new Error('Failed to get media info from Dropbox: ' + err.message);
+    }
+  }
+
+  async getAccountInfo() {
+    try {
+      const res = await this.dbx.usersGetCurrentAccount();
+      return {
+        accountId: res.result.account_id,
+        name: res.result.name,
+        email: res.result.email
+      };
+    } catch (err) {
+      throw new Error('Failed to get Dropbox account info: ' + err.message);
     }
   }
 }
