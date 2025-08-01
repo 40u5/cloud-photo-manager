@@ -2,6 +2,7 @@ import DropboxProvider from './dropbox-provider.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import EnvFileManager from './env-file-manager.js';
 
 // Load environment variables
 dotenv.config();
@@ -86,7 +87,7 @@ class CloudProviderManager {
       let provider;
 
       switch (providerType.toLowerCase()) {
-        case 'DROPBOX':
+        case 'dropbox':
           provider = new DropboxProvider(false);
           break;
         // more providers
@@ -94,26 +95,128 @@ class CloudProviderManager {
           throw new Error(`Unsupported provider type: ${providerType}`);
       }
       
-      if (writeToEnv) {
-        provider.writeEnvVariables(instanceIndex); // pass the instance index
-      } else {
-        // if not writing to env the credentials are already in the env
-        const authenticated = provider.addCredentials(instanceIndex);
-        
-        if (!authenticated) {
-          console.log(`Failed to authenticate Dropbox provider instance ${instanceIndex}`);
-        }
-      }
-
       this.providers[providerType].push(provider);
       
-      // Write credentials to .env file
-      // await this.writeCredentialsToEnv(providerType, credentials, instanceIndex);
+      if (writeToEnv) {
+        // This will be handled by the manager's writeEnvVariables method
+        console.log(`Provider instance ${instanceIndex} (${providerType}) created for env writing`);
+      } else {
+        // if not writing to env the credentials are already in the env
+        const authenticated = this.addCredentials(providerType, instanceIndex);
+        
+        if (!authenticated) {
+          console.log(`Failed to authenticate ${providerType} provider instance ${instanceIndex}`);
+        }
+      }
       
       console.log(`Provider instance ${instanceIndex} (${providerType}) added successfully`);
       return provider;
     } catch (error) {
       console.error(`Failed to add provider instance ${instanceIndex}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Add credentials to a provider instance using environment variables
+   * @param {string} providerType - Type of the provider
+   * @param {number} instanceIndex - Instance index (0-based)
+   * @returns {boolean} True if authentication was successful, false otherwise
+   */
+  addCredentials(providerType, instanceIndex) {
+    try {
+      const provider = this.getProvider(providerType, instanceIndex);
+      const patterns = provider.getEnvVariablePatterns(instanceIndex);
+      
+      // Extract credentials from environment variables
+      const credentials = {};
+      for (const [key, pattern] of Object.entries(patterns)) {
+        credentials[key] = process.env[pattern];
+      }
+      
+      // Authenticate the provider
+      return provider.authenticate(credentials);
+    } catch (error) {
+      console.error(`Failed to add credentials for ${providerType} instance ${instanceIndex}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Write credentials to .env file for a specific provider instance
+   * @param {string} providerType - Type of the provider
+   * @param {number} instanceIndex - Instance index (0-based)
+   * @param {Object} credentials - The credentials object
+   */
+  writeEnvVariables(providerType, instanceIndex, credentials) {
+    try {
+      const provider = this.getProvider(providerType, instanceIndex);
+      const patterns = provider.getEnvVariablePatterns(instanceIndex);
+      
+      // Validate that all required credentials are provided
+      const requiredKeys = Object.keys(patterns);
+      for (const key of requiredKeys) {
+        if (!credentials[key]) {
+          throw new Error(`Missing credential: ${key}`);
+        }
+      }
+      
+      // Create EnvFileManager instance
+      const envManager = new EnvFileManager();
+      
+      // Prepare the environment variables to write
+      const envLines = requiredKeys.map(key => `${patterns[key]}=${credentials[key]}`);
+      
+      // Write to .env file using EnvFileManager
+      envManager.writeLines(envLines, true); // append to existing content
+      
+      console.log(`Successfully wrote ${providerType} credentials for instance ${instanceIndex} to .env file`);
+    } catch (error) {
+      console.error(`Failed to write ${providerType} credentials for instance ${instanceIndex}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Update existing credentials in .env file for a specific provider instance
+   * @param {string} providerType - Type of the provider
+   * @param {number} instanceIndex - Instance index (0-based)
+   * @param {Object} credentials - The credentials object (only include the ones you want to update)
+   */
+  updateEnvVariables(providerType, instanceIndex, credentials) {
+    try {
+      const provider = this.getProvider(providerType, instanceIndex);
+      const patterns = provider.getEnvVariablePatterns(instanceIndex);
+      
+      // Validate that at least one credential is provided
+      if (!credentials || Object.keys(credentials).length === 0) {
+        throw new Error('No credentials provided for update');
+      }
+      
+      // Validate that all provided credentials are valid for this provider
+      const validKeys = Object.keys(patterns);
+      for (const key of Object.keys(credentials)) {
+        if (!validKeys.includes(key)) {
+          throw new Error(`Invalid credential key: ${key}. Valid keys are: ${validKeys.join(', ')}`);
+        }
+      }
+      
+      // Create EnvFileManager instance
+      const envManager = new EnvFileManager();
+      
+      // Prepare the edits to update only the provided environment variables
+      const edits = Object.keys(credentials).map(key => ({
+        pattern: `^${patterns[key]}=`,
+        newValue: credentials[key]
+      }));
+      
+      // Update the .env file using EnvFileManager
+      envManager.editLines(edits);
+      
+      const updatedKeys = Object.keys(credentials).join(', ');
+      console.log(`Successfully updated ${providerType} credentials for instance ${instanceIndex}: ${updatedKeys}`);
+    } catch (error) {
+      console.error(`Failed to update ${providerType} credentials for instance ${instanceIndex}:`, error.message);
       throw error;
     }
   }

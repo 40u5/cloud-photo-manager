@@ -1,23 +1,32 @@
 import express from 'express';
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
 import dotenv from 'dotenv';
+import cloudProviderManager from '../cloud-provider-manager.js';
+
 dotenv.config();
 
 const router = express.Router();
 
 // Step 1: Redirect to Dropbox with callback URL
-router.get('/auth/dropbox', (req, res) => {
-  const APP_KEY = process.env.DROPBOX_APP_KEY_1;
+router.get('/dropbox/:index', (req, res) => {
+  const { index } = req.params;
+  
+  // Validate that index is a number
+  const indexNum = parseInt(index);
+  if (isNaN(indexNum) || indexNum < 0) {
+    return res.status(400).json({ error: 'Index must be a positive number' });
+  }
+  
+  // Get the corresponding app key based on index
+  const APP_KEY = process.env[`DROPBOX_APP_KEY_${indexNum}`];
   
   if (!APP_KEY) {
-    return res.status(500).json({ error: 'DROPBOX_APP_KEY_1 not configured in environment variables' });
+    return res.status(500).json({ error: `DROPBOX_APP_KEY_${indexNum} not configured in environment variables` });
   }
   
   // Include redirect_uri for automatic callback
   const redirectUri = `${req.protocol}://${req.get('host')}/`;
-  const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=code&token_access_type=offline&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=code&token_access_type=offline&redirect_uri=${encodeURIComponent(redirectUri)}&state=${indexNum}`;
   
   // Automatically redirect user to Dropbox
   res.redirect(authUrl);
@@ -25,7 +34,7 @@ router.get('/auth/dropbox', (req, res) => {
 
 // Step 2: Handle automatic callback from Dropbox at root endpoint
 router.get('/', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
   
   // If no code or error, show the normal home page
   if (!code && !error) {
@@ -66,12 +75,15 @@ router.get('/', async (req, res) => {
   }
   
   try {
-    const APP_KEY = process.env.DROPBOX_APP_KEY_1;
-    const APP_SECRET = process.env.DROPBOX_APP_SECRET_1;
+    // Get the index from state parameter, default to 1 if not provided
+    const indexNum = state ? parseInt(state) : 1;
+    
+    const APP_KEY = process.env[`DROPBOX_APP_KEY_${indexNum}`];
+    const APP_SECRET = process.env[`DROPBOX_APP_SECRET_${indexNum}`];
     const redirectUri = `${req.protocol}://${req.get('host')}/`;
     
     if (!APP_KEY || !APP_SECRET) {
-      return res.status(500).json({ error: 'DROPBOX_APP_KEY_1 or DROPBOX_APP_SECRET_1 not configured' });
+      return res.status(500).json({ error: `DROPBOX_APP_KEY_${indexNum} or DROPBOX_APP_SECRET_${indexNum} not configured` });
     }
     
     // Exchange code for tokens (include redirect_uri since we used it)
@@ -92,15 +104,15 @@ router.get('/', async (req, res) => {
     
     const { access_token, refresh_token, expires_in } = response.data;
     
-    // Update .env file
-    await updateEnvFile({
-      DROPBOX_ACCESS_TOKEN_1: access_token,
-      DROPBOX_REFRESH_TOKEN_1: refresh_token
+    // Update .env file using cloud provider manager
+    cloudProviderManager.updateEnvVariables('dropbox', indexNum - 1, {
+      access_token: access_token,
+      refresh_token: refresh_token
     });
     
     // Update process.env for current session
-    process.env.DROPBOX_ACCESS_TOKEN_1 = access_token;
-    process.env.DROPBOX_REFRESH_TOKEN_1 = refresh_token;
+    process.env[`DROPBOX_ACCESS_TOKEN_${indexNum}`] = access_token;
+    process.env[`DROPBOX_REFRESH_TOKEN_${indexNum}`] = refresh_token;
     
     res.send(`
       <html>
@@ -131,55 +143,31 @@ router.get('/', async (req, res) => {
           <h1>❌ Error</h1>
           <p>${errorMessage}</p>
           <p><strong>Details:</strong> ${error.response?.data?.error_description || error.message}</p>
-          <p><a href="/auth/dropbox">← Try again</a></p>
+          <p><a href="/auth/dropbox/${indexNum}">← Try again</a></p>
         </body>
       </html>
     `);
   }
 });
 
-// Function to update .env file
-async function updateEnvFile(newVars) {
-  const envPath = path.resolve('.env');
-  let envContent = '';
-  
-  // Read existing .env file if it exists
-  if (fs.existsSync(envPath)) {
-    envContent = fs.readFileSync(envPath, 'utf8');
-  }
-  
-  // Parse existing variables
-  const envVars = {};
-  envContent.split('\n').forEach(line => {
-    const [key, ...valueParts] = line.split('=');
-    if (key && valueParts.length > 0) {
-      envVars[key.trim()] = valueParts.join('=').trim();
-    }
-  });
-  
-  // Update with new variables
-  Object.assign(envVars, newVars);
-  
-  // Reconstruct .env content
-  const newEnvContent = Object.entries(envVars)
-    .filter(([key, value]) => key && value)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-  
-  // Write back to .env file
-  fs.writeFileSync(envPath, newEnvContent);
-  console.log('✅ .env file updated with new tokens');
-}
 
-// Endpoint to refresh access token
-router.post('/auth/refresh', async (req, res) => {
+
+// Endpoint to refresh access token for specific index
+router.post('/auth/refresh/:index', async (req, res) => {
   try {
-    const refreshToken = process.env.DROPBOX_REFRESH_TOKEN_1;
-    const APP_KEY = process.env.DROPBOX_APP_KEY_1;
-    const APP_SECRET = process.env.DROPBOX_APP_SECRET_1;
+    const { index } = req.params;
+    const indexNum = parseInt(index);
+    
+    if (isNaN(indexNum) || indexNum < 1) {
+      return res.status(400).json({ error: 'Index must be a positive number' });
+    }
+    
+    const refreshToken = process.env[`DROPBOX_REFRESH_TOKEN_${indexNum}`];
+    const APP_KEY = process.env[`DROPBOX_APP_KEY_${indexNum}`];
+    const APP_SECRET = process.env[`DROPBOX_APP_SECRET_${indexNum}`];
     
     if (!refreshToken || !APP_KEY || !APP_SECRET) {
-      return res.status(400).json({ error: 'Missing required environment variables' });
+      return res.status(400).json({ error: `Missing required environment variables for index ${indexNum}` });
     }
     
     const response = await axios.post('https://api.dropboxapi.com/oauth2/token',
@@ -198,13 +186,13 @@ router.post('/auth/refresh', async (req, res) => {
     
     const { access_token, expires_in } = response.data;
     
-    // Update .env file with new access token
-    await updateEnvFile({
-      DROPBOX_ACCESS_TOKEN_1: access_token
+    // Update .env file with new access token using cloud provider manager
+    cloudProviderManager.updateEnvVariables('dropbox', indexNum - 1, {
+      access_token: access_token
     });
     
     // Update process.env for current session
-    process.env.DROPBOX_ACCESS_TOKEN_1 = access_token;
+    process.env[`DROPBOX_ACCESS_TOKEN_${indexNum}`] = access_token;
     
     res.json({
       message: 'Access token refreshed successfully',
