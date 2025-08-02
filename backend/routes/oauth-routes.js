@@ -80,10 +80,10 @@ router.get('/', async (req, res) => {
       }
     );
     
-    const { access_token, refresh_token, expires_in } = response.data;
+    const { access_token, refresh_token} = response.data;
     
     // Update .env file using cloud provider manager
-    cloudProviderManager.updateEnvVariables('dropbox', indexNum - 1, {
+    cloudProviderManager.updateEnvVariables('DROPBOX', indexNum - 1, {
       access_token: access_token,
       refresh_token: refresh_token
     });
