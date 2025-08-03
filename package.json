@@ -1,9 +1,9 @@
 {
   "name": "free-cloud-photos-server",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "backend/routes/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node backend/routes/server.js"
   },
   "dependencies": {
     "axios": "^1.10.0",

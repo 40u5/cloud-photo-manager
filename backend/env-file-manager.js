@@ -1,9 +1,24 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 class EnvFileManager {
-  constructor(envFilePath = '.env') {
-    this.envFilePath = path.resolve(envFilePath);
+  constructor(envFilePath = null) {
+    if (EnvFileManager.instance) {
+      return EnvFileManager.instance;
+    }
+    
+    if (envFilePath) {
+      this.envFilePath = path.resolve(envFilePath);
+    } else {
+      // Find the project root (where package.json is located)
+      const backendDir = path.dirname(fileURLToPath(import.meta.url));
+      const projectRoot = path.dirname(backendDir);
+      this.envFilePath = path.join(projectRoot, '.env');
+    }
+    
+    EnvFileManager.instance = this;
+    console.log("initialized env file manager with path ", this.envFilePath);
   }
 
   /**
@@ -65,7 +80,7 @@ class EnvFileManager {
       
       this.writeEnvFile(newContent);
       
-      console.log(`Successfully wrote ${validLines.length} line(s) to .env file`);
+      console.log(`Successfully wrote ${validLines.length} line(s) to .env file at ${this.envFilePath}`);
     } catch (error) {
       console.error('Error writing lines to .env file:', error.message);
       throw error;
@@ -248,6 +263,21 @@ class EnvFileManager {
       return null;
     }
   }
+
+  /**
+   * Create .env file if it doesn't exist
+   * @returns {boolean} True if file was created, false if it already exists
+   */
+  createEnvFile() {
+    if (fs.existsSync(this.envFilePath)) {
+      return false;
+    }
+    
+    fs.writeFileSync(this.envFilePath, '', 'utf8');
+    return true;
+  }
 }
 
-export default EnvFileManager; 
+// Export a singleton instance
+const envFileManager = new EnvFileManager();
+export default envFileManager; 

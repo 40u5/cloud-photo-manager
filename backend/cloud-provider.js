@@ -24,4 +24,8 @@ export default class CloudProvider {
   getStorage() {
     throw new Error("getStorage Not Implemented In Subclass")
   }
+
+  isAuthenticated() {
+    throw new Error("isAuthenticated Not Implemented In Subclass")
+  }
 }

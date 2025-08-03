@@ -1,11 +1,7 @@
 import DropboxProvider from './dropbox-provider.js';
-import dotenv from 'dotenv';
 import fs from 'fs';
-import path from 'path';
 import EnvFileManager from './env-file-manager.js';
 
-// Load environment variables
-dotenv.config();
 
 class CloudProviderManager {
   constructor() {
@@ -43,10 +39,16 @@ class CloudProviderManager {
   async initializeProviders() {
     let providerConfigs = {};
     
-    // Scan environment variables to find provider configurations
-    for (const key of Object.keys(process.env)) {
+    // Scan .env file to find provider configurations
+    const envContent = EnvFileManager.readEnvFile();
+    const lines = envContent.split('\n');
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+      
       // Look for patterns like DROPBOX_APP_KEY_0
-      const match = key.match(/^([A-Z_]+)_APP_KEY_(\d+)$/);
+      const match = trimmedLine.match(/^([A-Z_]+)_APP_KEY_(\d+)=/);
       if (match) {
         const providerType = match[1];
         const instanceIndex = parseInt(match[2]);
@@ -128,10 +130,10 @@ class CloudProviderManager {
       const provider = this.getProvider(providerType, instanceIndex);
       const patterns = provider.getEnvVariablePatterns(instanceIndex);
       
-      // Extract credentials from environment variables
+      // Extract credentials from .env file
       const credentials = {};
       for (const [key, pattern] of Object.entries(patterns)) {
-        credentials[key] = process.env[pattern];
+        credentials[key] = EnvFileManager.getValue(pattern);
       }
       
       // Authenticate the provider
@@ -153,24 +155,27 @@ class CloudProviderManager {
       const provider = this.getProvider(providerType, instanceIndex);
       const patterns = provider.getEnvVariablePatterns(instanceIndex);
       
-      // Validate that all required credentials are provided
-      const requiredKeys = Object.keys(patterns);
-      for (const key of requiredKeys) {
-        if (!credentials[key]) {
-          throw new Error(`Missing credential: ${key}`);
+      // Validate that at least one credential is provided
+      if (!credentials || Object.keys(credentials).length === 0) {
+        throw new Error('No credentials provided for writing');
+      }
+      
+      // Validate that all provided credentials are valid for this provider
+      const validKeys = Object.keys(patterns);
+      for (const key of Object.keys(credentials)) {
+        if (!validKeys.includes(key)) {
+          throw new Error(`Invalid credential key: ${key}. Valid keys are: ${validKeys.join(', ')}`);
         }
       }
       
-      // Create EnvFileManager instance
-      const envManager = new EnvFileManager();
+      // Ensure .env file exists
+      EnvFileManager.createEnvFile();
       
-      // Prepare the environment variables to write
-      const envLines = requiredKeys.map(key => `${patterns[key]}=${credentials[key]}`);
+      // Prepare the environment variables to write (only the provided ones)
+      const envLines = Object.keys(credentials).map(key => `${patterns[key]}=${credentials[key]}`);
       
       // Write to .env file using EnvFileManager
-      envManager.writeLines(envLines, true); // append to existing content
-      
-      console.log(`Successfully wrote ${providerType} credentials for instance ${instanceIndex} to .env file`);
+      EnvFileManager.writeLines(envLines, true); // append to existing content
     } catch (error) {
       console.error(`Failed to write ${providerType} credentials for instance ${instanceIndex}:`, error.message);
       throw error;
@@ -185,8 +190,11 @@ class CloudProviderManager {
    */
   updateEnvVariables(providerType, instanceIndex, credentials) {
     try {
+      
       const provider = this.getProvider(providerType, instanceIndex);
       const patterns = provider.getEnvVariablePatterns(instanceIndex);
+      
+      console.log('Provider patterns:', patterns);
       
       // Validate that at least one credential is provided
       if (!credentials || Object.keys(credentials).length === 0) {
@@ -201,9 +209,6 @@ class CloudProviderManager {
         }
       }
       
-      // Create EnvFileManager instance
-      const envManager = new EnvFileManager();
-      
       // Prepare the edits to update only the provided environment variables
       const edits = Object.keys(credentials).map(key => ({
         pattern: `^${patterns[key]}=`,
@@ -211,7 +216,7 @@ class CloudProviderManager {
       }));
       
       // Update the .env file using EnvFileManager
-      envManager.editLines(edits);
+      EnvFileManager.editLines(edits);
       
       const updatedKeys = Object.keys(credentials).join(', ');
       console.log(`Successfully updated ${providerType} credentials for instance ${instanceIndex}: ${updatedKeys}`);
@@ -253,7 +258,9 @@ class CloudProviderManager {
    */
   removeInstanceEnvVariable(providerType, instanceIndex) {
     try {
-      const envPath = path.resolve('.env');
+      // Use the singleton EnvFileManager instance
+      const envManager = EnvFileManager;
+      const envPath = envManager.envFilePath;
       
       if (!fs.existsSync(envPath)) {
         console.warn('.env file not found, skipping env variable removal');

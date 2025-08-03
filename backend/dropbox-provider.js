@@ -11,6 +11,14 @@ class DropboxProvider extends CloudProvider {
   }
 
   /**
+   * Check if the provider is authenticated
+   * @returns {boolean} True if authenticated, false otherwise
+   */
+  isAuthenticated() {
+    return this.authenticated;
+  }
+
+  /**
    * Get the environment variable patterns for Dropbox provider
    * @param {number} instanceIndex - The instance index (0-based)
    * @returns {Object} Object containing the environment variable patterns
@@ -103,7 +111,6 @@ class DropboxProvider extends CloudProvider {
       this.authenticated = true;
 
       // Update environment variables with new tokens
-      const envManager = new EnvFileManager();
       const patterns = this.getEnvVariablePatterns(instanceIndex);
       
       const edits = [
@@ -121,7 +128,7 @@ class DropboxProvider extends CloudProvider {
         });
       }
       
-      envManager.editLines(edits);
+      EnvFileManager.editLines(edits);
       
       // Update process.env for current session
       process.env[patterns.accessToken] = access_token;
