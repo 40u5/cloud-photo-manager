@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showStatus('Adding provider...', 'info');
             
             // Step 1: Add the provider with credentials
-            const addResponse = await fetch('/api/add-provider', {
+            const addResponse = await fetch('/provider/add-provider', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to load and display current providers
     async function loadProviders() {
         try {
-            const response = await fetch('/api/providers');
+            const response = await fetch('/provider/providers');
             if (response.ok) {
                 const providers = await response.json();
                 displayProviders(providers);
@@ -83,13 +83,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const providersHtml = providers.map(provider => `
             <div class="provider-item">
-                <h4>${provider.type} Provider (Instance ${provider.instanceIndex})</h4>
+                <div class="provider-header">
+                    <h4>${provider.type} Provider (Instance ${provider.instanceIndex})</h4>
+                    <button class="remove-provider-btn" data-provider-type="${provider.type}" data-instance-index="${provider.instanceIndex}">
+                        Remove
+                    </button>
+                </div>
                 <p>Status: ${provider.authenticated ? 'Authenticated' : 'Not Authenticated'}</p>
                 ${provider.accountInfo ? `<p>Account: ${provider.accountInfo.name} (${provider.accountInfo.email})</p>` : ''}
             </div>
         `).join('');
 
         providersList.innerHTML = providersHtml;
+        
+        // Add event listeners to remove buttons
+        const removeButtons = document.querySelectorAll('.remove-provider-btn');
+        removeButtons.forEach(button => {
+            button.addEventListener('click', handleRemoveProvider);
+        });
+    }
+
+    // Function to handle provider removal
+    async function handleRemoveProvider(event) {
+        const button = event.target;
+        const providerType = button.getAttribute('data-provider-type');
+        const instanceIndex = parseInt(button.getAttribute('data-instance-index'));
+        
+        // Confirm removal with user
+        if (!confirm(`Are you sure you want to remove ${providerType} Provider (Instance ${instanceIndex})? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            showStatus('Removing provider...', 'info');
+            
+            const response = await fetch('/provider/remove-provider', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    providerType: providerType,
+                    instanceIndex: instanceIndex
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to remove provider');
+            }
+
+            showStatus('Provider removed successfully!', 'success');
+            loadProviders(); // Refresh the providers list
+            
+        } catch (error) {
+            console.error('Error:', error);
+            showStatus(`Error: ${error.message}`, 'error');
+        }
     }
 
     // Load providers on page load
