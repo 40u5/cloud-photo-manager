@@ -18,7 +18,6 @@ class EnvFileManager {
     }
     
     EnvFileManager.instance = this;
-    console.log("initialized env file manager with path ", this.envFilePath);
   }
 
   /**

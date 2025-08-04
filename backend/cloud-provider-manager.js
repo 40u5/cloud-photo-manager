@@ -65,7 +65,7 @@ class CloudProviderManager {
       // Initialize providers from index 0 to maxIndex
       for (let i = 0; i <= maxIndex; i++) {
         try {
-          await this.addProvider(providerType, false); // use existing credentials in env
+          await this.addProvider(providerType); // use existing credentials in env
         } catch (error) {
           console.warn(`Failed to initialize ${providerType} instance ${i}:`, error.message);
         }
@@ -77,9 +77,8 @@ class CloudProviderManager {
    * Add a new provider instance to the manager
    * @param {string} providerType - Type of the provider (e.g., 'dropbox', 'googleDrive')
    * @param {number} instanceIndex - Instance index for the provider
-   * @param {boolean} writeToEnv - Whether to write credentials to .env file
    */
-  async addProvider(providerType, writeToEnv) {
+  async addProvider(providerType) {
     try {
       // Generate instance ID if not provided
       if (!this.providers[providerType]) {
@@ -93,17 +92,10 @@ class CloudProviderManager {
       provider = new ProviderClass(false);
       
       this.providers[providerType].push(provider);
+      const authenticated = this.addCredentials(providerType);
       
-      if (writeToEnv) {
-        // This will be handled by the manager's writeEnvVariables method
-        console.log(`Provider instance (${providerType}) created for env writing`);
-      } else {
-        // if not writing to env the credentials are already in the env
-        const authenticated = this.addCredentials(providerType);
-        
-        if (!authenticated) {
-          console.log(`Failed to authenticate ${providerType} provider`);
-        }
+      if (!authenticated) {
+        console.log(`Failed to authenticate ${providerType} provider`);
       }
       
       console.log(`Provider instance (${providerType}) added successfully`);

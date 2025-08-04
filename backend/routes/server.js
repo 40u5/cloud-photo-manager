@@ -13,6 +13,12 @@ envFileManager.createEnvFile();
 
 const app = express();
 const PORT = 3000;
+const OAUTH_ROUTE = '/auth';
+const PROVIDER_ROUTE = '/provider';
+
+// Export redirect URI configuration for use in other modules
+export const getRedirectUri = (req) => `${req.protocol}://${req.get('host')}${OAUTH_ROUTE}/`;
+export const getStaticRedirectUri = () => `http://localhost:${PORT}${OAUTH_ROUTE}/`;
 
 // Add middleware to parse form data
 app.use(express.urlencoded({ extended: true }));
@@ -36,8 +42,10 @@ app.use((req, res, next) => {
 // Serve static files from frontend directory
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
-app.use('/auth', oauthRouter);
-app.use('/provider', providerRouter);
+app.use(OAUTH_ROUTE, oauthRouter);
+app.use(PROVIDER_ROUTE, providerRouter);
+
+console.log('redirect URI:', getStaticRedirectUri());
 
 // Home page - serve the frontend HTML
 app.get('/', (req, res) => {

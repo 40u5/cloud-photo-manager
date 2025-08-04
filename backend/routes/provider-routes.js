@@ -18,7 +18,7 @@ router.post('/add-provider', async (req, res) => {
     }
     
     // Add the provider to the manager
-    await cloudProviderManager.addProvider(providerType.toUpperCase(), true);
+    await cloudProviderManager.addProvider(providerType.toUpperCase());
     const assignedInstanceIndex = cloudProviderManager.providers[providerType.toUpperCase()].length - 1;
     
     // Write credentials to .env file

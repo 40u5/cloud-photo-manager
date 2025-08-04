@@ -1,6 +1,7 @@
 import express from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
 import envFileManager from '../env-file-manager.js';
+import { getRedirectUri } from './server.js';
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
     const patterns = providerInstance.getEnvVariablePatterns(indexNum);
     const APP_KEY = envFileManager.getValue(patterns.appKey);
     const APP_SECRET = envFileManager.getValue(patterns.appSecret);
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/`;
+    const redirectUri = getRedirectUri(req);
     
     if (!APP_KEY || !APP_SECRET) {
       return res.status(500).json({ 
@@ -114,7 +115,7 @@ router.get('/authorize', (req, res) => {
     }
     
     // Include redirect_uri for automatic callback
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/`;
+    const redirectUri = getRedirectUri(req);
     const state = `${providerType.toLowerCase()}:${index}`;
     
     // Use provider's method to get authorization URL
