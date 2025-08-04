@@ -1,7 +1,7 @@
-import CloudProvider from './cloud-provider.js';
+import CloudProvider from '../cloud-provider.js';
 import { Dropbox, DropboxAuth } from 'dropbox';
 import axios from 'axios';
-import EnvFileManager from './env-file-manager.js';
+import EnvFileManager from '../env-file-manager.js';
 
 class DropboxProvider extends CloudProvider {
   constructor(authenticated) {
@@ -30,6 +30,52 @@ class DropboxProvider extends CloudProvider {
       accessToken: `DROPBOX_ACCESS_TOKEN_${instanceIndex}`,
       refreshToken: `DROPBOX_REFRESH_TOKEN_${instanceIndex}`
     };
+  }
+
+  /**
+   * Get the OAuth authorization URL for Dropbox
+   * @param {string} appKey - The app key/client ID
+   * @param {string} redirectUri - The redirect URI
+   * @param {string} state - The state parameter (usually instance index)
+   * @returns {string} The authorization URL
+   */
+  getAuthorizationUrl(appKey, redirectUri, state) {
+    return `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  }
+
+  /**
+   * Exchange authorization code for access token
+   * @param {string} code - The authorization code
+   * @param {string} appKey - The app key/client ID
+   * @param {string} appSecret - The app secret
+   * @param {string} redirectUri - The redirect URI
+   * @returns {Object} Object containing access_token and refresh_token
+   */
+  async exchangeCodeForToken(code, appKey, appSecret, redirectUri) {
+    const response = await axios.post('https://api.dropboxapi.com/oauth2/token', 
+      new URLSearchParams({
+        code: code,
+        grant_type: 'authorization_code',
+        client_id: appKey,
+        client_secret: appSecret,
+        redirect_uri: redirectUri
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get the provider type name
+   * @returns {string} The provider type name
+   */
+  getProviderType() {
+    return 'dropbox';
   }
 
   /**

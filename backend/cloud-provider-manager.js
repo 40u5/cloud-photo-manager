@@ -1,4 +1,4 @@
-import DropboxProvider from './dropbox-provider.js';
+import DropboxProvider from './providers/dropbox-provider.js';
 import fs from 'fs';
 import EnvFileManager from './env-file-manager.js';
 
@@ -65,7 +65,7 @@ class CloudProviderManager {
       // Initialize providers from index 0 to maxIndex
       for (let i = 0; i <= maxIndex; i++) {
         try {
-          await this.addProvider(providerType, i, false); // use existing credentials in env
+          await this.addProvider(providerType, false); // use existing credentials in env
         } catch (error) {
           console.warn(`Failed to initialize ${providerType} instance ${i}:`, error.message);
         }
@@ -79,7 +79,7 @@ class CloudProviderManager {
    * @param {number} instanceIndex - Instance index for the provider
    * @param {boolean} writeToEnv - Whether to write credentials to .env file
    */
-  async addProvider(providerType, instanceIndex, writeToEnv) {
+  async addProvider(providerType, writeToEnv) {
     try {
       // Generate instance ID if not provided
       if (!this.providers[providerType]) {
@@ -88,33 +88,28 @@ class CloudProviderManager {
 
       let provider;
 
-      switch (providerType.toLowerCase()) {
-        case 'dropbox':
-          provider = new DropboxProvider(false);
-          break;
-        // more providers
-        default:
-          throw new Error(`Unsupported provider type: ${providerType}`);
-      }
+      // Dynamically get the provider class from string and instantiate
+      const ProviderClass = this.getProviderClass(providerType);
+      provider = new ProviderClass(false);
       
       this.providers[providerType].push(provider);
       
       if (writeToEnv) {
         // This will be handled by the manager's writeEnvVariables method
-        console.log(`Provider instance ${instanceIndex} (${providerType}) created for env writing`);
+        console.log(`Provider instance (${providerType}) created for env writing`);
       } else {
         // if not writing to env the credentials are already in the env
-        const authenticated = this.addCredentials(providerType, instanceIndex);
+        const authenticated = this.addCredentials(providerType);
         
         if (!authenticated) {
-          console.log(`Failed to authenticate ${providerType} provider instance ${instanceIndex}`);
+          console.log(`Failed to authenticate ${providerType} provider`);
         }
       }
       
-      console.log(`Provider instance ${instanceIndex} (${providerType}) added successfully`);
+      console.log(`Provider instance (${providerType}) added successfully`);
       return provider;
     } catch (error) {
-      console.error(`Failed to add provider instance ${instanceIndex}:`, error.message);
+      console.error(`Failed to add provider instance:`, error.message);
       throw error;
     }
   }
@@ -122,11 +117,11 @@ class CloudProviderManager {
   /**
    * Add credentials to a provider instance using environment variables
    * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index (0-based)
    * @returns {boolean} True if authentication was successful, false otherwise
    */
-  addCredentials(providerType, instanceIndex) {
+  addCredentials(providerType) {
     try {
+      const instanceIndex = this.providers[providerType].length - 1;
       const provider = this.getProvider(providerType, instanceIndex);
       const patterns = provider.getEnvVariablePatterns(instanceIndex);
       
@@ -248,6 +243,21 @@ class CloudProviderManager {
 
     // Return the requested instance
     return providerInstances[instanceIndex];
+  }
+
+  /**
+   * Get the provider class by type
+   * @param {string} providerType - Type of the provider
+   * @returns {Class} The provider class
+   */
+  getProviderClass(providerType) {
+    switch (providerType.toLowerCase()) {
+      case 'dropbox':
+        return DropboxProvider;
+      // Add more providers here as they are implemented
+      default:
+        throw new Error(`Unsupported provider type: ${providerType}`);
+    }
   }
 
   /**

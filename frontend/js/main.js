@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(dropboxForm);
         const appKey = formData.get('appKey');
         const appSecret = formData.get('appSecret');
-        const instanceIndex = parseInt(formData.get('instanceIndex'));
 
         if (!appKey || !appSecret) {
             showStatus('Please fill in all required fields.', 'error');
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     providerType: 'DROPBOX',
-                    instanceIndex: instanceIndex,
                     credentials: {
                         appKey: appKey,
                         appSecret: appSecret
@@ -41,11 +39,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(errorData.error || 'Failed to add provider');
             }
 
+            const addResponseData = await addResponse.json();
             showStatus('Provider added successfully! Initiating authorization...', 'success');
 
             // Step 2: Redirect to OAuth authorization
             // The backend OAuth route will handle the authorization flow
-            window.location.href = `/auth/dropbox/${instanceIndex}`;
+            // Get the instance index from the response or use 0 as default
+            const instanceIndex = addResponseData.instanceIndex || 0;
+            
+            window.location.href = `/auth/authorize?providerType=dropbox&index=${instanceIndex}`;
 
         } catch (error) {
             console.error('Error:', error);
@@ -147,13 +149,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Check if we're returning from OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
-    const authSuccess = urlParams.get('auth_success');
-    const authError = urlParams.get('auth_error');
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const error = urlParams.get('error');
 
-    if (authSuccess === 'true') {
+    if (code && state) {
+        // We're returning from OAuth callback with success
         showStatus('Authorization successful! Your Dropbox provider has been configured.', 'success');
         loadProviders(); // Refresh the providers list
-    } else if (authError) {
-        showStatus(`Authorization failed: ${authError}`, 'error');
+    } else if (error) {
+        showStatus(`Authorization failed: ${error}`, 'error');
     }
 });

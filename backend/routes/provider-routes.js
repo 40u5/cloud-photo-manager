@@ -6,33 +6,23 @@ const router = express.Router();
 // Provider endpoint to add a new provider
 router.post('/add-provider', async (req, res) => {
   try {
-    const { providerType, instanceIndex, credentials } = req.body;
+    const { providerType, credentials } = req.body;
     
-    if (!providerType || instanceIndex === undefined || !credentials) {
-      return res.status(400).json({ error: 'Missing required fields: providerType, instanceIndex, credentials' });
+    if (!providerType || !credentials) {
+      return res.status(400).json({ error: 'Missing required fields: providerType, credentials' });
     }
-    
-    // Validate provider type
-    if (providerType.toUpperCase() !== 'DROPBOX') {
-      return res.status(400).json({ error: 'Only DROPBOX provider type is currently supported' });
-    }
-    
-    // Validate instance index
-    const indexNum = parseInt(instanceIndex);
-    if (isNaN(indexNum) || indexNum < 0) {
-      return res.status(400).json({ error: 'Instance index must be a non-negative number' });
-    }
-    
+        
     // Validate credentials
     if (!credentials.appKey || !credentials.appSecret) {
       return res.status(400).json({ error: 'Missing required credentials: appKey and appSecret' });
     }
     
     // Add the provider to the manager
-    await cloudProviderManager.addProvider(providerType.toUpperCase(), indexNum, true);
+    await cloudProviderManager.addProvider(providerType.toUpperCase(), true);
+    const assignedInstanceIndex = cloudProviderManager.providers[providerType.toUpperCase()].length - 1;
     
     // Write credentials to .env file
-    cloudProviderManager.writeEnvVariables(providerType.toUpperCase(), indexNum, {
+    cloudProviderManager.writeEnvVariables(providerType.toUpperCase(), assignedInstanceIndex, {
       appKey: credentials.appKey,
       appSecret: credentials.appSecret,
       refreshToken: credentials.refreshToken,
@@ -42,7 +32,7 @@ router.post('/add-provider', async (req, res) => {
     res.json({ 
       message: 'Provider added successfully',
       providerType: providerType.toUpperCase(),
-      instanceIndex: indexNum
+      instanceIndex: assignedInstanceIndex
     });
     
   } catch (error) {
@@ -107,12 +97,7 @@ router.delete('/remove-provider', async (req, res) => {
     const { providerType, instanceIndex } = req.body;
     
     if (!providerType || instanceIndex === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: providerType, instanceIndex' });
-    }
-    
-    // Validate provider type
-    if (providerType.toUpperCase() !== 'DROPBOX') {
-      return res.status(400).json({ error: 'Only DROPBOX provider type is currently supported' });
+      return res.status(400).json({ error: 'At least one of the following fields is missing: providerType, instanceIndex' });
     }
     
     // Validate instance index
