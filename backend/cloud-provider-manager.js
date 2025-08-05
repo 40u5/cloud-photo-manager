@@ -50,7 +50,7 @@ class CloudProviderManager {
       // Look for patterns like DROPBOX_APP_KEY_0
       const match = trimmedLine.match(/^([A-Z_]+)_APP_KEY_(\d+)=/);
       if (match) {
-        const providerType = match[1];
+        const providerType = match[1].toLowerCase(); // Convert to lowercase for consistency
         const instanceIndex = parseInt(match[2]);
         
         // Track the maximum index for each provider type
@@ -65,7 +65,7 @@ class CloudProviderManager {
       // Initialize providers from index 0 to maxIndex
       for (let i = 0; i <= maxIndex; i++) {
         try {
-          await this.addProvider(providerType); // use existing credentials in env
+          await this.addProvider(providerType, i); // use existing credentials in env
         } catch (error) {
           console.warn(`Failed to initialize ${providerType} instance ${i}:`, error.message);
         }
@@ -76,11 +76,11 @@ class CloudProviderManager {
   /**
    * Add a new provider instance to the manager
    * @param {string} providerType - Type of the provider (e.g., 'dropbox', 'googleDrive')
-   * @param {number} instanceIndex - Instance index for the provider
+   * @param {number} instanceIndex - Optional instance index for the provider (defaults to next available index)
    */
-  async addProvider(providerType) {
+  async addProvider(providerType, instanceIndex = null) {
     try {
-      // Generate instance ID if not provided
+      // Initialize provider array if it doesn't exist
       if (!this.providers[providerType]) {
         this.providers[providerType] = [];
       }
@@ -91,14 +91,27 @@ class CloudProviderManager {
       const ProviderClass = this.getProviderClass(providerType);
       provider = new ProviderClass(false);
       
-      this.providers[providerType].push(provider);
-      const authenticated = this.addCredentials(providerType);
-      
-      if (!authenticated) {
-        console.log(`Failed to authenticate ${providerType} provider`);
+      // If instanceIndex is provided, ensure we have enough slots
+      if (instanceIndex !== null) {
+        // Ensure the array is large enough to accommodate the specified index
+        while (this.providers[providerType].length <= instanceIndex) {
+          this.providers[providerType].push(null);
+        }
+        this.providers[providerType][instanceIndex] = provider;
+      } else {
+        // Add to the end of the array
+        this.providers[providerType].push(provider);
       }
       
-      console.log(`Provider instance (${providerType}) added successfully`);
+      const actualIndex = instanceIndex !== null ? instanceIndex : this.providers[providerType].length - 1;
+      const authenticated = this.addCredentials(providerType, actualIndex);
+      
+      if (!authenticated) {
+        console.log(`Failed to authenticate ${providerType} provider at index ${actualIndex}`);
+      }
+      
+      console.log(`Provider instance (${providerType}) added successfully at index ${actualIndex}`);
+      console.log(`Current providers for ${providerType}:`, this.providers[providerType].map((p, i) => p ? `index ${i}: exists` : `index ${i}: null`));
       return provider;
     } catch (error) {
       console.error(`Failed to add provider instance:`, error.message);
@@ -109,13 +122,14 @@ class CloudProviderManager {
   /**
    * Add credentials to a provider instance using environment variables
    * @param {string} providerType - Type of the provider
+   * @param {number} instanceIndex - Instance index for the provider
    * @returns {boolean} True if authentication was successful, false otherwise
    */
-  addCredentials(providerType) {
+  addCredentials(providerType, instanceIndex = null) {
     try {
-      const instanceIndex = this.providers[providerType].length - 1;
-      const provider = this.getProvider(providerType, instanceIndex);
-      const patterns = provider.getEnvVariablePatterns(instanceIndex);
+      const actualIndex = instanceIndex !== null ? instanceIndex : this.providers[providerType].length - 1;
+      const provider = this.getProvider(providerType, actualIndex);
+      const patterns = provider.getEnvVariablePatterns(actualIndex);
       
       // Extract credentials from .env file
       const credentials = {};
@@ -126,7 +140,7 @@ class CloudProviderManager {
       // Authenticate the provider
       return provider.authenticate(credentials);
     } catch (error) {
-      console.error(`Failed to add credentials for ${providerType} instance ${instanceIndex}:`, error.message);
+      console.error(`Failed to add credentials for ${providerType} instance ${actualIndex}:`, error.message);
       return false;
     }
   }
@@ -233,8 +247,14 @@ class CloudProviderManager {
       throw new Error(`Invalid instance index ${instanceIndex}. Available instances: 0-${availableCount - 1}`);
     }
 
+    // Check if the instance exists (not null)
+    const provider = providerInstances[instanceIndex];
+    if (!provider) {
+      throw new Error(`Provider instance ${instanceIndex} for type ${providerType} does not exist`);
+    }
+
     // Return the requested instance
-    return providerInstances[instanceIndex];
+    return provider;
   }
 
   /**

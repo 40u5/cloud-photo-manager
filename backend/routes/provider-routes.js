@@ -18,11 +18,11 @@ router.post('/add-provider', async (req, res) => {
     }
     
     // Add the provider to the manager
-    await cloudProviderManager.addProvider(providerType.toUpperCase());
-    const assignedInstanceIndex = cloudProviderManager.providers[providerType.toUpperCase()].length - 1;
+    await cloudProviderManager.addProvider(providerType.toLowerCase());
+    const assignedInstanceIndex = cloudProviderManager.providers[providerType.toLowerCase()].length - 1;
     
     // Write credentials to .env file
-    cloudProviderManager.writeEnvVariables(providerType.toUpperCase(), assignedInstanceIndex, {
+    cloudProviderManager.writeEnvVariables(providerType.toLowerCase(), assignedInstanceIndex, {
       appKey: credentials.appKey,
       appSecret: credentials.appSecret,
       refreshToken: credentials.refreshToken,
@@ -31,7 +31,7 @@ router.post('/add-provider', async (req, res) => {
     
     res.json({ 
       message: 'Provider added successfully',
-      providerType: providerType.toUpperCase(),
+      providerType: providerType.toLowerCase(),
       instanceIndex: assignedInstanceIndex
     });
     
@@ -107,11 +107,11 @@ router.delete('/remove-provider', async (req, res) => {
     }
     
     // Remove the provider from the manager
-    cloudProviderManager.removeProvider(providerType.toUpperCase(), indexNum);
+    cloudProviderManager.removeProvider(providerType.toLowerCase(), indexNum);
     
     res.json({ 
       message: 'Provider removed successfully',
-      providerType: providerType.toUpperCase(),
+      providerType: providerType.toLowerCase(),
       instanceIndex: indexNum
     });
     

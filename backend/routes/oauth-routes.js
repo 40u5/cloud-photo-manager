@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
 });
 
 // Endpoint to authorize any provider type
-router.get('/authorize', (req, res) => {
+router.get('/authorize', async (req, res) => {
   const { providerType, index } = req.query;
   
   let providerError = !providerType ? 'Missing required parameter: providerType': ''
@@ -95,10 +95,7 @@ router.get('/authorize', (req, res) => {
       providerInstance = cloudProviderManager.getProvider(providerType.toLowerCase(), index);
     } catch (error) {
       // If provider doesn't exist, create a new instance and add it to the manager
-      providerInstance = new (cloudProviderManager.getProviderClass(providerType.toLowerCase()))(false);
-      // Add the provider to the manager so it can be found in future requests
-      cloudProviderManager.providers[providerType.toLowerCase()] = cloudProviderManager.providers[providerType.toLowerCase()] || [];
-      cloudProviderManager.providers[providerType.toLowerCase()].push(providerInstance);
+      providerInstance = await cloudProviderManager.addProvider(providerType.toLowerCase());
     }
     
     // Ensure .env file exists

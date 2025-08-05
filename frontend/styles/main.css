@@ -203,6 +203,36 @@ header p {
     margin: 0;
 }
 
+.provider-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.authenticate-provider-btn {
+    padding: 6px 12px;
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.authenticate-provider-btn:hover {
+    background-color: #229954;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(39, 174, 96, 0.3);
+}
+
+.authenticate-provider-btn:active {
+    transform: translateY(0);
+}
+
 .remove-provider-btn {
     padding: 6px 12px;
     background-color: #e74c3c;

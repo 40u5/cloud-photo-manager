@@ -87,9 +87,16 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="provider-item">
                 <div class="provider-header">
                     <h4>${provider.type} Provider (Instance ${provider.instanceIndex})</h4>
-                    <button class="remove-provider-btn" data-provider-type="${provider.type}" data-instance-index="${provider.instanceIndex}">
-                        Remove
-                    </button>
+                    <div class="provider-actions">
+                        ${!provider.authenticated ? 
+                            `<button class="authenticate-provider-btn" data-provider-type="${provider.type}" data-instance-index="${provider.instanceIndex}">
+                                Authenticate
+                            </button>` : ''
+                        }
+                        <button class="remove-provider-btn" data-provider-type="${provider.type}" data-instance-index="${provider.instanceIndex}">
+                            Remove
+                        </button>
+                    </div>
                 </div>
                 <p>Status: ${provider.authenticated ? 'Authenticated' : 'Not Authenticated'}</p>
                 ${provider.accountInfo ? `<p>Account: ${provider.accountInfo.name} (${provider.accountInfo.email})</p>` : ''}
@@ -103,6 +110,30 @@ document.addEventListener('DOMContentLoaded', function() {
         removeButtons.forEach(button => {
             button.addEventListener('click', handleRemoveProvider);
         });
+
+        // Add event listeners to authenticate buttons
+        const authenticateButtons = document.querySelectorAll('.authenticate-provider-btn');
+        authenticateButtons.forEach(button => {
+            button.addEventListener('click', handleAuthenticateProvider);
+        });
+    }
+
+    // Function to handle provider authentication
+    async function handleAuthenticateProvider(event) {
+        const button = event.target;
+        const providerType = button.getAttribute('data-provider-type');
+        const instanceIndex = parseInt(button.getAttribute('data-instance-index'));
+        
+        try {
+            showStatus('Initiating authentication...', 'info');
+            
+            // Redirect to OAuth authorization endpoint
+            window.location.href = `/auth/authorize?providerType=${providerType.toLowerCase()}&index=${instanceIndex}`;
+            
+        } catch (error) {
+            console.error('Error:', error);
+            showStatus(`Error: ${error.message}`, 'error');
+        }
     }
 
     // Function to handle provider removal
