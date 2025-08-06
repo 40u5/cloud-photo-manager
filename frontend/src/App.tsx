@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Provider, AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusType } from './types';
 import ProviderItem from './components/ProviderItem';
+import StatusAlert from './components/StatusAlert';
 
 function App() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -182,20 +183,21 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <StatusAlert status={status} onClose={() => setStatus(null)} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="text-center mb-10">
           <div className="bg-white rounded-xl shadow-lg p-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">Cloud Photo Manager</h1>
-            <p className="text-xl text-gray-600">Setup your Dropbox provider</p>
           </div>
         </header>
 
         <main className="space-y-8">
-          {/* Setup Section */}
+          {/* Provider Setup Section */}
+          <p className="text-xl text-gray-600">Setup your Dropbox provider</p>
           <div className="bg-white rounded-xl shadow-lg p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-500">
-              Add Dropbox Provider
+              Provider Setup
             </h2>
             
             <form onSubmit={handleFormSubmit} className="space-y-6">
@@ -243,23 +245,11 @@ function App() {
             </form>
           </div>
 
-          {/* Status Section */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Status</h3>
-            {status && (
-              <div className={`p-4 rounded-lg font-medium ${
-                status.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
-                status.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' :
-                'bg-blue-100 text-blue-800 border border-blue-200'
-              }`}>
-                {status.message}
-              </div>
-            )}
-          </div>
-
-          {/* Providers Section */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Providers</h3>
+          {/* Current Providers Section */}
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-green-500">
+              Current Providers
+            </h2>
             <div className="space-y-4">
               {providers.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">No providers configured yet.</p>
