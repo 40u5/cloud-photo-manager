@@ -13,7 +13,7 @@ envFileManager.createEnvFile();
 
 const app = express();
 const PORT = 3000;
-const OAUTH_ROUTE = '/auth';
+const OAUTH_ROUTE = '/oauth';
 const PROVIDER_ROUTE = '/provider';
 
 // Export redirect URI configuration for use in other modules

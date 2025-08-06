@@ -76,7 +76,7 @@ The frontend communicates with the backend API endpoints:
 - `GET /provider/providers` - Get list of configured providers
 - `POST /provider/add-provider` - Add a new provider
 - `DELETE /provider/remove-provider` - Remove a provider
-- `GET /auth/authorize` - OAuth authorization flow
+- `GET /oauth/authorize` - OAuth authorization flow
 
 ## Features
 

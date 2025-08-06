@@ -97,7 +97,7 @@ function App() {
 
       // Step 2: Redirect to OAuth authorization
       const instanceIndex = addResponseData.instanceIndex || 0;
-      window.location.href = `/auth/authorize?providerType=dropbox&index=${instanceIndex}`;
+      window.location.href = `/oauth/authorize?providerType=dropbox&index=${instanceIndex}`;
 
     } catch (error) {
       console.error('Error:', error);
@@ -118,7 +118,7 @@ function App() {
       });
       
       // Redirect to OAuth authorization endpoint
-      window.location.href = `/auth/authorize?providerType=${providerType.toLowerCase()}&index=${instanceIndex}`;
+      window.location.href = `/oauth/authorize?providerType=${providerType.toLowerCase()}&index=${instanceIndex}`;
       
     } catch (error) {
       console.error('Error:', error);
@@ -181,82 +181,102 @@ function App() {
   };
 
   return (
-    <div className="container">
-      <header>
-        <h1>Cloud Photo Manager</h1>
-        <p>Setup your Dropbox provider</p>
-      </header>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <header className="text-center mb-10">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Cloud Photo Manager</h1>
+            <p className="text-xl text-gray-600">Setup your Dropbox provider</p>
+          </div>
+        </header>
 
-      <main>
-        <div className="setup-section">
-          <h2>Add Dropbox Provider</h2>
-          
-          <form onSubmit={handleFormSubmit} className="provider-form">
-            <div className="form-group">
-              <label htmlFor="appKey">App Key:</label>
-              <input
-                type="text"
-                id="appKey"
-                name="appKey"
-                value={formData.appKey}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your Dropbox app key"
-              />
-            </div>
+        <main className="space-y-8">
+          {/* Setup Section */}
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-500">
+              Add Dropbox Provider
+            </h2>
             
-            <div className="form-group">
-              <label htmlFor="appSecret">App Secret:</label>
-              <input
-                type="password"
-                id="appSecret"
-                name="appSecret"
-                value={formData.appSecret}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your Dropbox app secret"
-              />
-            </div>
-            
-            <div className="form-actions">
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Adding Provider...' : 'Add Provider & Authorize'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div className="status-section">
-          <h3>Status</h3>
-          {status && (
-            <div className={`status-message ${status.type}`}>
-              {status.message}
-            </div>
-          )}
-        </div>
-
-        <div className="providers-section">
-          <h3>Current Providers</h3>
-          <div className="providers-list">
-            {providers.length === 0 ? (
-              <p>No providers configured yet.</p>
-            ) : (
-              providers.map(provider => (
-                <ProviderItem
-                  key={`${provider.type}-${provider.instanceIndex}`}
-                  provider={provider}
-                  onAuthenticate={handleAuthenticateProvider}
-                  onRemove={handleRemoveProvider}
+            <form onSubmit={handleFormSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label htmlFor="appKey" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  App Key:
+                </label>
+                <input
+                  type="text"
+                  id="appKey"
+                  name="appKey"
+                  value={formData.appKey}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Enter your Dropbox app key"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
                 />
-              ))
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="appSecret" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  App Secret:
+                </label>
+                <input
+                  type="password"
+                  id="appSecret"
+                  name="appSecret"
+                  value={formData.appSecret}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Enter your Dropbox app secret"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                />
+              </div>
+              
+              <div className="pt-4">
+                <button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-lg disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  {isLoading ? 'Adding Provider...' : 'Add Provider & Authorize'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Status Section */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Status</h3>
+            {status && (
+              <div className={`p-4 rounded-lg font-medium ${
+                status.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
+                status.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' :
+                'bg-blue-100 text-blue-800 border border-blue-200'
+              }`}>
+                {status.message}
+              </div>
             )}
           </div>
-        </div>
-      </main>
+
+          {/* Providers Section */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Providers</h3>
+            <div className="space-y-4">
+              {providers.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No providers configured yet.</p>
+              ) : (
+                providers.map(provider => (
+                  <ProviderItem
+                    key={`${provider.type}-${provider.instanceIndex}`}
+                    provider={provider}
+                    onAuthenticate={handleAuthenticateProvider}
+                    onRemove={handleRemoveProvider}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
