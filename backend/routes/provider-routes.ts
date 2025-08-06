@@ -1,12 +1,34 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
+import { Credentials } from '../cloud-provider.js';
+
+interface ProviderInfo {
+  type: string;
+  instanceIndex: number;
+  authenticated: boolean;
+  accountInfo?: {
+    accountId: string;
+    name: string;
+    email: string;
+  };
+}
+
+interface AddProviderRequest {
+  providerType: string;
+  credentials: Credentials;
+}
+
+interface RemoveProviderRequest {
+  providerType: string;
+  instanceIndex: number;
+}
 
 const router = express.Router();
 
 // Provider endpoint to add a new provider
-router.post('/add-provider', async (req, res) => {
+router.post('/add-provider', async (req: Request, res: Response) => {
   try {
-    const { providerType, credentials } = req.body;
+    const { providerType, credentials }: AddProviderRequest = req.body;
     
     if (!providerType || !credentials) {
       return res.status(400).json({ error: 'Missing required fields: providerType, credentials' });
@@ -37,20 +59,20 @@ router.post('/add-provider', async (req, res) => {
     
   } catch (error) {
     console.error('Error adding provider:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 // Provider endpoint to get all providers
-router.get('/providers', async (req, res) => {
+router.get('/providers', async (req: Request, res: Response) => {
   try {
-    const providers = [];
+    const providers: ProviderInfo[] = [];
     
     // Get all provider types
     for (const [providerType, instances] of Object.entries(cloudProviderManager.providers)) {
       for (let i = 0; i < instances.length; i++) {
         const provider = instances[i];
-        const providerInfo = {
+        const providerInfo: ProviderInfo = {
           type: providerType,
           instanceIndex: i,
           authenticated: provider.isAuthenticated ? provider.isAuthenticated() : false
@@ -61,7 +83,7 @@ router.get('/providers', async (req, res) => {
           try {
             providerInfo.accountInfo = await provider.getAccountInfo();
           } catch (error) {
-            console.warn(`Failed to get account info for ${providerType} instance ${i}:`, error.message);
+            console.warn(`Failed to get account info for ${providerType} instance ${i}:`, error instanceof Error ? error.message : 'Unknown error');
             // If getting account info fails, the provider might not be properly authenticated
             providerInfo.authenticated = false;
           }
@@ -75,33 +97,33 @@ router.get('/providers', async (req, res) => {
     
   } catch (error) {
     console.error('Error getting providers:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 // Provider endpoint to get photos
-router.get('/photos', async (req, res) => {
+router.get('/photos', async (req: Request, res: Response) => {
   try {
     // Use the manager to get the first Dropbox provider instance (index 0)
     const provider = cloudProviderManager.getProvider('DROPBOX', 0);
     const files = await provider.listFiles('');
     res.json(files);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
   }
 });
 
 // Provider endpoint to remove a provider
-router.delete('/remove-provider', async (req, res) => {
+router.delete('/remove-provider', async (req: Request, res: Response) => {
   try {
-    const { providerType, instanceIndex } = req.body;
+    const { providerType, instanceIndex }: RemoveProviderRequest = req.body;
     
     if (!providerType || instanceIndex === undefined) {
       return res.status(400).json({ error: 'At least one of the following fields is missing: providerType, instanceIndex' });
     }
     
     // Validate instance index
-    const indexNum = parseInt(instanceIndex);
+    const indexNum = parseInt(instanceIndex.toString());
     if (isNaN(indexNum) || indexNum < 0) {
       return res.status(400).json({ error: 'Instance index must be a non-negative number' });
     }
@@ -117,8 +139,8 @@ router.delete('/remove-provider', async (req, res) => {
     
   } catch (error) {
     console.error('Error removing provider:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
-export default router;
+export default router; 

@@ -1,9 +1,21 @@
 import DropboxProvider from './providers/dropbox-provider.js';
 import fs from 'fs';
 import EnvFileManager from './env-file-manager.js';
+import CloudProvider, { Credentials } from './cloud-provider.js';
 
+interface ProviderConfigs {
+  [key: string]: number;
+}
+
+interface ProviderInstances {
+  [key: string]: CloudProvider[];
+}
 
 class CloudProviderManager {
+  private static instance: CloudProviderManager;
+  public providers: ProviderInstances = {};
+  private isInitialized: boolean = false;
+
   constructor() {
     if (CloudProviderManager.instance) {
       return CloudProviderManager.instance;
@@ -19,7 +31,7 @@ class CloudProviderManager {
   /**
    * Initialize the manager from environment variables
    */
-  async initialize() {
+  async initialize(): Promise<void> {
     if (this.isInitialized) {
       console.log('CloudProviderManager already initialized');
       return;
@@ -36,8 +48,8 @@ class CloudProviderManager {
   /**
    * Initialize providers from environment variables
    */
-  async initializeProviders() {
-    let providerConfigs = {};
+  async initializeProviders(): Promise<void> {
+    let providerConfigs: ProviderConfigs = {};
     
     // Scan .env file to find provider configurations
     const envContent = EnvFileManager.readEnvFile();
@@ -67,7 +79,7 @@ class CloudProviderManager {
         try {
           await this.addProvider(providerType, i); // use existing credentials in env
         } catch (error) {
-          console.warn(`Failed to initialize ${providerType} instance ${i}:`, error.message);
+          console.warn(`Failed to initialize ${providerType} instance ${i}:`, error instanceof Error ? error.message : 'Unknown error');
         }
       }
     }
@@ -75,17 +87,17 @@ class CloudProviderManager {
 
   /**
    * Add a new provider instance to the manager
-   * @param {string} providerType - Type of the provider (e.g., 'dropbox', 'googleDrive')
-   * @param {number} instanceIndex - Optional instance index for the provider (defaults to next available index)
+   * @param providerType - Type of the provider (e.g., 'dropbox', 'googleDrive')
+   * @param instanceIndex - Optional instance index for the provider (defaults to next available index)
    */
-  async addProvider(providerType, instanceIndex = null) {
+  async addProvider(providerType: string, instanceIndex: number | null = null): Promise<CloudProvider> {
     try {
       // Initialize provider array if it doesn't exist
       if (!this.providers[providerType]) {
         this.providers[providerType] = [];
       }
 
-      let provider;
+      let provider: CloudProvider;
 
       // Dynamically get the provider class from string and instantiate
       const ProviderClass = this.getProviderClass(providerType);
@@ -95,7 +107,7 @@ class CloudProviderManager {
       if (instanceIndex !== null) {
         // Ensure the array is large enough to accommodate the specified index
         while (this.providers[providerType].length <= instanceIndex) {
-          this.providers[providerType].push(null);
+          this.providers[providerType].push(null as any);
         }
         this.providers[providerType][instanceIndex] = provider;
       } else {
@@ -114,44 +126,46 @@ class CloudProviderManager {
       console.log(`Current providers for ${providerType}:`, this.providers[providerType].map((p, i) => p ? `index ${i}: exists` : `index ${i}: null`));
       return provider;
     } catch (error) {
-      console.error(`Failed to add provider instance:`, error.message);
+      console.error(`Failed to add provider instance:`, error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Add credentials to a provider instance using environment variables
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index for the provider
-   * @returns {boolean} True if authentication was successful, false otherwise
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index for the provider
+   * @returns True if authentication was successful, false otherwise
    */
-  addCredentials(providerType, instanceIndex = null) {
+  addCredentials(providerType: string, instanceIndex: number | null = null): boolean {
     try {
       const actualIndex = instanceIndex !== null ? instanceIndex : this.providers[providerType].length - 1;
       const provider = this.getProvider(providerType, actualIndex);
       const patterns = provider.getEnvVariablePatterns(actualIndex);
       
       // Extract credentials from .env file
-      const credentials = {};
-      for (const [key, pattern] of Object.entries(patterns)) {
-        credentials[key] = EnvFileManager.getValue(pattern);
-      }
+      const credentials: Credentials = {
+        appKey: EnvFileManager.getValue(patterns.appKey) || '',
+        appSecret: EnvFileManager.getValue(patterns.appSecret) || '',
+        accessToken: EnvFileManager.getValue(patterns.accessToken) || undefined,
+        refreshToken: EnvFileManager.getValue(patterns.refreshToken) || undefined
+      };
       
       // Authenticate the provider
       return provider.authenticate(credentials);
     } catch (error) {
-      console.error(`Failed to add credentials for ${providerType} instance ${actualIndex}:`, error.message);
+      console.error(`Failed to add credentials for ${providerType} instance ${instanceIndex}:`, error instanceof Error ? error.message : 'Unknown error');
       return false;
     }
   }
 
   /**
    * Write credentials to .env file for a specific provider instance
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index (0-based)
-   * @param {Object} credentials - The credentials object
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index (0-based)
+   * @param credentials - The credentials object
    */
-  writeEnvVariables(providerType, instanceIndex, credentials) {
+  writeEnvVariables(providerType: string, instanceIndex: number, credentials: Credentials): void {
     try {
       const provider = this.getProvider(providerType, instanceIndex);
       const patterns = provider.getEnvVariablePatterns(instanceIndex);
@@ -169,27 +183,24 @@ class CloudProviderManager {
         }
       }
       
-      // Ensure .env file exists
-      EnvFileManager.createEnvFile();
-      
       // Prepare the environment variables to write (only the provided ones)
-      const envLines = Object.keys(credentials).map(key => `${patterns[key]}=${credentials[key]}`);
+      const envLines = Object.keys(credentials).map(key => `${patterns[key as keyof typeof patterns]}=${credentials[key as keyof Credentials]}`);
       
       // Write to .env file using EnvFileManager
       EnvFileManager.writeLines(envLines, true); // append to existing content
     } catch (error) {
-      console.error(`Failed to write ${providerType} credentials for instance ${instanceIndex}:`, error.message);
+      console.error(`Failed to write ${providerType} credentials for instance ${instanceIndex}:`, error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Update existing credentials in .env file for a specific provider instance
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index (0-based)
-   * @param {Object} credentials - The credentials object (only include the ones you want to update)
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index (0-based)
+   * @param credentials - The credentials object (only include the ones you want to update)
    */
-  updateEnvVariables(providerType, instanceIndex, credentials) {
+  updateEnvVariables(providerType: string, instanceIndex: number, credentials: Credentials): void {
     try {
       
       const provider = this.getProvider(providerType, instanceIndex);
@@ -212,8 +223,8 @@ class CloudProviderManager {
       
       // Prepare the edits to update only the provided environment variables
       const edits = Object.keys(credentials).map(key => ({
-        pattern: `^${patterns[key]}=`,
-        newValue: credentials[key]
+        pattern: `^${patterns[key as keyof typeof patterns]}=`,
+        newValue: credentials[key as keyof Credentials] as string
       }));
       
       // Update the .env file using EnvFileManager
@@ -222,18 +233,18 @@ class CloudProviderManager {
       const updatedKeys = Object.keys(credentials).join(', ');
       console.log(`Successfully updated ${providerType} credentials for instance ${instanceIndex}: ${updatedKeys}`);
     } catch (error) {
-      console.error(`Failed to update ${providerType} credentials for instance ${instanceIndex}:`, error.message);
+      console.error(`Failed to update ${providerType} credentials for instance ${instanceIndex}:`, error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Get a provider instance by type and instance index
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index (0-based)
-   * @returns {Object} The provider instance object
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index (0-based)
+   * @returns The provider instance object
    */
-  getProvider(providerType, instanceIndex) {
+  getProvider(providerType: string, instanceIndex: number): CloudProvider {
     const providerInstances = this.providers[providerType];
     
     // Check if provider type exists
@@ -259,10 +270,10 @@ class CloudProviderManager {
 
   /**
    * Get the provider class by type
-   * @param {string} providerType - Type of the provider
-   * @returns {Class} The provider class
+   * @param providerType - Type of the provider
+   * @returns The provider class
    */
-  getProviderClass(providerType) {
+  getProviderClass(providerType: string): new (authenticated: boolean) => CloudProvider {
     switch (providerType.toLowerCase()) {
       case 'dropbox':
         return DropboxProvider;
@@ -275,10 +286,10 @@ class CloudProviderManager {
   /**
    * Remove environment variables for a specific provider instance
    * and decrement all provider variable indexes greater than instanceIndex
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index to remove
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index to remove
    */
-  removeInstanceEnvVariable(providerType, instanceIndex) {
+  removeInstanceEnvVariable(providerType: string, instanceIndex: number): void {
     try {
       // Use the singleton EnvFileManager instance
       const envManager = EnvFileManager;
@@ -331,16 +342,16 @@ class CloudProviderManager {
       console.log(`Removed environment variables for ${providerType} instance ${instanceIndex} and decremented higher indexes`);
       
     } catch (error) {
-      console.error(`Failed to remove environment variables for ${providerType} instance ${instanceIndex}:`, error.message);
+      console.error(`Failed to remove environment variables for ${providerType} instance ${instanceIndex}:`, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
   /**
    * Remove a provider instance by index and decrement all the providers 
-   * @param {string} providerType - Type of the provider
-   * @param {number} instanceIndex - Instance index (0-based)
+   * @param providerType - Type of the provider
+   * @param instanceIndex - Instance index (0-based)
    */
-  removeProvider(providerType, instanceIndex) {
+  removeProvider(providerType: string, instanceIndex: number): void {
     const providerInstances = this.providers[providerType];
     
     // Check if provider type exists
@@ -368,4 +379,4 @@ class CloudProviderManager {
 
 // Export a singleton instance
 const cloudProviderManager = new CloudProviderManager();
-export default cloudProviderManager;
+export default cloudProviderManager; 

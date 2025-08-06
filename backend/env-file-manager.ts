@@ -2,8 +2,17 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+export interface EditObject {
+  pattern: string;
+  newValue: string;
+  replaceEntireLine?: boolean;
+}
+
 class EnvFileManager {
-  constructor(envFilePath = null) {
+  private static instance: EnvFileManager;
+  public envFilePath: string = '';
+
+  constructor(envFilePath: string | null = null) {
     if (EnvFileManager.instance) {
       return EnvFileManager.instance;
     }
@@ -12,9 +21,20 @@ class EnvFileManager {
       this.envFilePath = path.resolve(envFilePath);
     } else {
       // Find the project root (where package.json is located)
-      const backendDir = path.dirname(fileURLToPath(import.meta.url));
-      const projectRoot = path.dirname(backendDir);
-      this.envFilePath = path.join(projectRoot, '.env');
+      const currentFile = fileURLToPath(import.meta.url);
+      const currentDir = path.dirname(currentFile);
+      
+      // Check if we're running from dist directory
+      if (currentDir.includes('dist')) {
+        // Go up two levels: dist/backend -> dist -> project root
+        const projectRoot = path.dirname(path.dirname(currentDir));
+        this.envFilePath = path.join(projectRoot, '.env');
+      } else {
+        // Running from source directory
+        const backendDir = currentDir;
+        const projectRoot = path.dirname(backendDir);
+        this.envFilePath = path.join(projectRoot, '.env');
+      }
     }
     
     EnvFileManager.instance = this;
@@ -22,41 +42,41 @@ class EnvFileManager {
 
   /**
    * Read the current .env file content
-   * @returns {string} The content of the .env file
+   * @returns The content of the .env file
    */
-  readEnvFile() {
+  readEnvFile(): string {
     try {
       if (!fs.existsSync(this.envFilePath)) {
         return '';
       }
       return fs.readFileSync(this.envFilePath, 'utf8');
     } catch (error) {
-      console.error('Error reading .env file:', error.message);
+      console.error('Error reading .env file:', error instanceof Error ? error.message : 'Unknown error');
       return '';
     }
   }
 
   /**
    * Write content to the .env file
-   * @param {string} content - The content to write to the .env file
+   * @param content - The content to write to the .env file
    */
-  writeEnvFile(content) {
+  writeEnvFile(content: string): void {
     try {
       // Ensure the content ends with a newline
       const finalContent = content ? content + '\n' : '';
       fs.writeFileSync(this.envFilePath, finalContent, 'utf8');
     } catch (error) {
-      console.error('Error writing to .env file:', error.message);
+      console.error('Error writing to .env file:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Write new lines to the .env file
-   * @param {Array<string>} lines - Array of lines to write (e.g., ['KEY=value', 'ANOTHER_KEY=another_value'])
-   * @param {boolean} append - Whether to append to existing content (default: true)
+   * @param lines - Array of lines to write (e.g., ['KEY=value', 'ANOTHER_KEY=another_value'])
+   * @param append - Whether to append to existing content (default: true)
    */
-  writeLines(lines, append = true) {
+  writeLines(lines: string[], append: boolean = true): void {
     try {
       let currentContent = '';
       
@@ -81,19 +101,19 @@ class EnvFileManager {
       
       console.log(`Successfully wrote ${validLines.length} line(s) to .env file at ${this.envFilePath}`);
     } catch (error) {
-      console.error('Error writing lines to .env file:', error.message);
+      console.error('Error writing lines to .env file:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Edit existing lines in the .env file by matching patterns and updating values
-   * @param {Array<Object>} edits - Array of edit objects with pattern and newValue
-   * @param {string} edits[].pattern - Regex pattern to match lines (e.g., '^DROPBOX_APP_KEY_\\d+=' for matching DROPBOX_APP_KEY_0=, DROPBOX_APP_KEY_1=, etc.)
-   * @param {string} edits[].newValue - The new value to set (e.g., 'new_app_key_here')
-   * @param {boolean} edits[].replaceEntireLine - Whether to replace the entire line or just the value part (default: false)
+   * @param edits - Array of edit objects with pattern and newValue
+   * @param edits[].pattern - Regex pattern to match lines (e.g., '^DROPBOX_APP_KEY_\\d+=' for matching DROPBOX_APP_KEY_0=, DROPBOX_APP_KEY_1=, etc.)
+   * @param edits[].newValue - The new value to set (e.g., 'new_app_key_here')
+   * @param edits[].replaceEntireLine - Whether to replace the entire line or just the value part (default: false)
    */
-  editLines(edits) {
+  editLines(edits: EditObject[]): void {
     try {
       const currentContent = this.readEnvFile();
       
@@ -150,17 +170,17 @@ class EnvFileManager {
         console.log('No matching lines found to edit');
       }
     } catch (error) {
-      console.error('Error editing lines in .env file:', error.message);
+      console.error('Error editing lines in .env file:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Remove lines that match a specific pattern
-   * @param {string} pattern - Regex pattern to match lines to remove
-   * @returns {number} Number of lines removed
+   * @param pattern - Regex pattern to match lines to remove
+   * @returns Number of lines removed
    */
-  removeLines(pattern) {
+  removeLines(pattern: string): number {
     try {
       const currentContent = this.readEnvFile();
       
@@ -186,17 +206,17 @@ class EnvFileManager {
       
       return removedCount;
     } catch (error) {
-      console.error('Error removing lines from .env file:', error.message);
+      console.error('Error removing lines from .env file:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
 
   /**
    * Get all lines that match a specific pattern
-   * @param {string} pattern - Regex pattern to match lines
-   * @returns {Array<string>} Array of matching lines
+   * @param pattern - Regex pattern to match lines
+   * @returns Array of matching lines
    */
-  getMatchingLines(pattern) {
+  getMatchingLines(pattern: string): string[] {
     try {
       const currentContent = this.readEnvFile();
       
@@ -209,17 +229,17 @@ class EnvFileManager {
       
       return lines.filter(line => regex.test(line.trim()));
     } catch (error) {
-      console.error('Error getting matching lines from .env file:', error.message);
+      console.error('Error getting matching lines from .env file:', error instanceof Error ? error.message : 'Unknown error');
       return [];
     }
   }
 
   /**
    * Check if a specific key exists in the .env file
-   * @param {string} key - The environment variable key to check
-   * @returns {boolean} True if the key exists, false otherwise
+   * @param key - The environment variable key to check
+   * @returns True if the key exists, false otherwise
    */
-  hasKey(key) {
+  hasKey(key: string): boolean {
     try {
       const currentContent = this.readEnvFile();
       
@@ -230,17 +250,17 @@ class EnvFileManager {
       const lines = currentContent.split('\n');
       return lines.some(line => line.trim().startsWith(`${key}=`));
     } catch (error) {
-      console.error('Error checking key existence in .env file:', error.message);
+      console.error('Error checking key existence in .env file:', error instanceof Error ? error.message : 'Unknown error');
       return false;
     }
   }
 
   /**
    * Get the value of a specific key from the .env file
-   * @param {string} key - The environment variable key
-   * @returns {string|null} The value of the key, or null if not found
+   * @param key - The environment variable key
+   * @returns The value of the key, or null if not found
    */
-  getValue(key) {
+  getValue(key: string): string | null {
     try {
       const currentContent = this.readEnvFile();
       
@@ -258,16 +278,16 @@ class EnvFileManager {
       
       return null;
     } catch (error) {
-      console.error('Error getting value from .env file:', error.message);
+      console.error('Error getting value from .env file:', error instanceof Error ? error.message : 'Unknown error');
       return null;
     }
   }
 
   /**
    * Create .env file if it doesn't exist
-   * @returns {boolean} True if file was created, false if it already exists
+   * @returns True if file was created, false if it already exists
    */
-  createEnvFile() {
+  createEnvFile(): boolean {
     if (fs.existsSync(this.envFilePath)) {
       return false;
     }

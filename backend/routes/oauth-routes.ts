@@ -1,26 +1,27 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
 import envFileManager from '../env-file-manager.js';
 import { getRedirectUri } from './server.js';
+import CloudProvider, { Credentials } from '../cloud-provider.js';
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   const { code, state } = req.query;
   
   try {
     // Get the provider type and index from state parameter
     // State format: "providerType:index" (e.g., "dropbox:0")
-    const [providerType, indexStr] = state.split(':');
+    const [providerType, indexStr] = (state as string).split(':');
     const indexNum = parseInt(indexStr) || 0;
     
     // Get the provider instance
-    let providerInstance;
+    let providerInstance: CloudProvider;
     try {
       providerInstance = cloudProviderManager.getProvider(providerType.toLowerCase(), indexNum);
     } catch (error) {
       return res.status(404).json({ 
-        error: `Provider not found: ${error.message}` 
+        error: `Provider not found: ${error instanceof Error ? error.message : 'Unknown error'}` 
       });
     }
     
@@ -37,14 +38,14 @@ router.get('/', async (req, res) => {
     }
     
     // Exchange code for tokens using provider's method
-    const tokenData = await providerInstance.exchangeCodeForToken(code, APP_KEY, APP_SECRET, redirectUri);
+    const tokenData = await providerInstance.exchangeCodeForToken(code as string, APP_KEY, APP_SECRET, redirectUri);
     const { access_token, refresh_token } = tokenData;
     
     // Store tokens in variables and update .env file using cloud provider manager
     cloudProviderManager.updateEnvVariables(providerType.toLowerCase(), indexNum, {
       accessToken: access_token,
       refreshToken: refresh_token
-    });
+    } as any);
     
     // Now authenticate the provider with the new tokens
     try {
@@ -55,19 +56,19 @@ router.get('/', async (req, res) => {
         console.warn(`Failed to authenticate ${providerType} provider instance ${indexNum}`);
       }
     } catch (error) {
-      console.error(`Error authenticating provider instance ${indexNum}:`, error.message);
+      console.error(`Error authenticating provider instance ${indexNum}:`, error instanceof Error ? error.message : 'Unknown error');
     }
     
     // Redirect to home page
     res.redirect(`/`);
     
   } catch (error) {
-    console.error('Error exchanging code for tokens:', error.response?.data || error.message);
+    console.error('Error exchanging code for tokens:', error instanceof Error ? error.message : 'Unknown error');
     
     let errorMessage = 'Failed to exchange code for tokens';
-    if (error.response?.data?.error === 'invalid_grant') {
+    if (error instanceof Error && error.message.includes('invalid_grant')) {
       errorMessage = 'The authorization code has expired or been used already. Please try again.';
-    } else if (error.response?.data?.error === 'redirect_uri_mismatch') {
+    } else if (error instanceof Error && error.message.includes('redirect_uri_mismatch')) {
       errorMessage = 'Redirect URI mismatch. Make sure the redirect URI is registered.';
     }
     
@@ -76,12 +77,12 @@ router.get('/', async (req, res) => {
 });
 
 // Endpoint to authorize any provider type
-router.get('/authorize', async (req, res) => {
+router.get('/authorize', async (req: Request, res: Response) => {
   const { providerType, index } = req.query;
   
-  let providerError = !providerType ? 'Missing required parameter: providerType': ''
+  let providerError = !providerType ? 'Missing required parameter: providerType': '';
   let indexError = !index ? 'Missing required parameter: index' : '';
-  if (!indexError && (isNaN(index) || index < 0)) indexError = 'Index must be a non-negative number';
+  if (!indexError && (isNaN(Number(index)) || Number(index) < 0)) indexError = 'Index must be a non-negative number';
   if (providerError || indexError) {
     return res.status(400).json({ 
       error: providerError || indexError 
@@ -92,17 +93,14 @@ router.get('/authorize', async (req, res) => {
     // Get the provider instance to access its methods
     let providerInstance;
     try {
-      providerInstance = cloudProviderManager.getProvider(providerType.toLowerCase(), index);
+      providerInstance = cloudProviderManager.getProvider((providerType as string).toLowerCase(), Number(index));
     } catch (error) {
       // If provider doesn't exist, create a new instance and add it to the manager
-      providerInstance = await cloudProviderManager.addProvider(providerType.toLowerCase());
+      providerInstance = await cloudProviderManager.addProvider((providerType as string).toLowerCase());
     }
     
-    // Ensure .env file exists
-    envFileManager.createEnvFile();
-
     // Get the corresponding app key based on index
-    const patterns = providerInstance.getEnvVariablePatterns(index);
+    const patterns = providerInstance.getEnvVariablePatterns(Number(index));
     const APP_KEY = envFileManager.getValue(patterns.appKey);
     
     if (!APP_KEY) {
@@ -113,7 +111,7 @@ router.get('/authorize', async (req, res) => {
     
     // Include redirect_uri for automatic callback
     const redirectUri = getRedirectUri(req);
-    const state = `${providerType.toLowerCase()}:${index}`;
+    const state = `${(providerType as string).toLowerCase()}:${index}`;
     
     // Use provider's method to get authorization URL
     const authUrl = providerInstance.getAuthorizationUrl(APP_KEY, redirectUri, state);
@@ -122,15 +120,15 @@ router.get('/authorize', async (req, res) => {
     res.redirect(authUrl);
     
   } catch (error) {
-    console.error(`Error authorizing ${providerType}:`, error.message);
+    console.error(`Error authorizing ${providerType}:`, error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ 
-      error: `Failed to authorize ${providerType}: ${error.message}` 
+      error: `Failed to authorize ${providerType}: ${error instanceof Error ? error.message : 'Unknown error'}` 
     });
   }
 });
 
 // Endpoint to refresh access token for any provider type
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const { providerType, index } = req.body;
     
@@ -140,7 +138,7 @@ router.post('/refresh', async (req, res) => {
       });
     }
     
-    const indexNum = parseInt(index);
+    const indexNum = parseInt(index as string);
     
     if (isNaN(indexNum) || indexNum < 0) {
       return res.status(400).json({ error: 'Index must be a non-negative number' });
@@ -149,19 +147,19 @@ router.post('/refresh', async (req, res) => {
     // Get the provider instance
     let provider;
     try {
-      provider = cloudProviderManager.getProvider(providerType.toLowerCase(), indexNum);
+      provider = cloudProviderManager.getProvider((providerType as string).toLowerCase(), indexNum);
     } catch (error) {
       return res.status(404).json({ 
-        error: `Provider not found: ${error.message}` 
+        error: `Provider not found: ${error instanceof Error ? error.message : 'Unknown error'}` 
       });
     }
     
     // Get credentials from environment variables
     const patterns = provider.getEnvVariablePatterns(indexNum);
-    const credentials = {
-      appKey: envFileManager.getValue(patterns.appKey),
-      appSecret: envFileManager.getValue(patterns.appSecret),
-      refreshToken: envFileManager.getValue(patterns.refreshToken)
+    const credentials: Credentials = {
+      appKey: envFileManager.getValue(patterns.appKey) || '',
+      appSecret: envFileManager.getValue(patterns.appSecret) || '',
+      refreshToken: envFileManager.getValue(patterns.refreshToken) || undefined
     };
     
     if (!credentials.refreshToken || !credentials.appKey || !credentials.appSecret) {
@@ -176,7 +174,7 @@ router.post('/refresh', async (req, res) => {
     if (result.success) {
       res.json({
         message: result.message,
-        access_token: result.accessToken.substring(0, 20) + '...',
+        access_token: result.accessToken?.substring(0, 20) + '...',
         provider_type: providerType,
         index: indexNum
       });
@@ -188,12 +186,12 @@ router.post('/refresh', async (req, res) => {
     }
     
   } catch (error) {
-    console.error('Error refreshing token:', error.response?.data || error.message);
+    console.error('Error refreshing token:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ 
       error: 'Failed to refresh access token',
-      details: error.response?.data || error.message 
+      details: error instanceof Error ? error.message : 'Unknown error' 
     });
   }
 });
 
-export default router;
+export default router; 

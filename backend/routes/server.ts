@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import oauthRouter from './oauth-routes.js';
@@ -17,16 +17,15 @@ const OAUTH_ROUTE = '/auth';
 const PROVIDER_ROUTE = '/provider';
 
 // Export redirect URI configuration for use in other modules
-export const getRedirectUri = (req) => `${req.protocol}://${req.get('host')}${OAUTH_ROUTE}/`;
-export const getStaticRedirectUri = () => `http://localhost:${PORT}${OAUTH_ROUTE}/`;
+export const getRedirectUri = (req: Request): string => `${req.protocol}://${req.get('host')}${OAUTH_ROUTE}/`;
+export const getStaticRedirectUri = (): string => `http://localhost:${PORT}${OAUTH_ROUTE}/`;
 
 // Add middleware to parse form data
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-
 // Add CORS headers to allow frontend requests
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -39,8 +38,8 @@ app.use((req, res, next) => {
   }
 });
 
-// Serve static files from frontend directory
-app.use(express.static(path.join(__dirname, '../../frontend')));
+// Serve static files from compiled frontend directory
+app.use(express.static(path.join(__dirname, '../../../dist/frontend')));
 
 app.use(OAUTH_ROUTE, oauthRouter);
 app.use(PROVIDER_ROUTE, providerRouter);
@@ -48,8 +47,8 @@ app.use(PROVIDER_ROUTE, providerRouter);
 console.log('redirect URI:', getStaticRedirectUri());
 
 // Home page - serve the frontend HTML
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+app.get('/', (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../../../dist/frontend/index.html'));
 });
 
 // Initialize CloudProviderManager before starting the server
@@ -59,5 +58,4 @@ app.get('/', (req, res) => {
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
-})();
-
+})(); 
