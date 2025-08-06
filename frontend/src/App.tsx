@@ -2,15 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Provider, AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusType } from './types';
 import ProviderItem from './components/ProviderItem';
 import StatusAlert from './components/StatusAlert';
+import DropboxForm from './components/DropboxForm';
 
 function App() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [status, setStatus] = useState<{ message: string; type: StatusType } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    appKey: '',
-    appSecret: ''
-  });
+
 
   const loadProviders = useCallback(async () => {
     try {
@@ -52,9 +50,7 @@ function App() {
     checkOAuthCallback();
   }, [loadProviders, checkOAuthCallback]);
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleFormSubmit = async (formData: { appKey: string; appSecret: string }) => {
     if (!formData.appKey || !formData.appSecret) {
       setStatus({
         message: 'Please fill in all required fields.',
@@ -173,13 +169,7 @@ function App() {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev: { appKey: string; appSecret: string }) => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -195,55 +185,7 @@ function App() {
         <main className="space-y-8">
           {/* Provider Setup Section */}
           <p className="text-xl text-gray-600">Setup your Dropbox provider</p>
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-500">
-              Provider Setup
-            </h2>
-            
-            <form onSubmit={handleFormSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <label htmlFor="appKey" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  App Key:
-                </label>
-                <input
-                  type="text"
-                  id="appKey"
-                  name="appKey"
-                  value={formData.appKey}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Enter your Dropbox app key"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="appSecret" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  App Secret:
-                </label>
-                <input
-                  type="password"
-                  id="appSecret"
-                  name="appSecret"
-                  value={formData.appSecret}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Enter your Dropbox app secret"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                />
-              </div>
-              
-              <div className="pt-4">
-                <button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-lg disabled:cursor-not-allowed disabled:shadow-none"
-                >
-                  {isLoading ? 'Adding Provider...' : 'Add Provider & Authorize'}
-                </button>
-              </div>
-            </form>
-          </div>
+          <DropboxForm onSubmit={handleFormSubmit} isLoading={isLoading} />
 
           {/* Current Providers Section */}
           <div className="bg-white rounded-xl shadow-lg p-8">
