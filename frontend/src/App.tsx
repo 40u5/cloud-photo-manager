@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Provider, AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusType } from './types';
 import ProviderItem from './components/ProviderItem';
 import StatusAlert from './components/StatusAlert';
-import DropboxForm from './components/DropboxForm';
+import ProviderForms from './components/ProviderForms';
 
 function App() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -184,8 +184,7 @@ function App() {
 
         <main className="space-y-8">
           {/* Provider Setup Section */}
-          <p className="text-xl text-gray-600">Setup your Dropbox provider</p>
-          <DropboxForm onSubmit={handleFormSubmit} isLoading={isLoading} />
+          <ProviderForms onSubmit={handleFormSubmit} isLoading={isLoading} />
 
           {/* Current Providers Section */}
           <div className="bg-white rounded-xl shadow-lg p-8">
