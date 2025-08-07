@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
 import envFileManager from '../env-file-manager.js';
 import { getRedirectUri } from './server.js';
-import CloudProvider, { Credentials } from '../cloud-provider.js';
+import CloudProvider from '../cloud-provider.js';
+import { Credentials } from '../types.js';
 
 const router = express.Router();
 

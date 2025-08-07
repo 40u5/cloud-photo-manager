@@ -1,27 +1,6 @@
 import express, { Request, Response } from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
-import { Credentials } from '../cloud-provider.js';
-
-interface ProviderInfo {
-  type: string;
-  instanceIndex: number;
-  authenticated: boolean;
-  accountInfo?: {
-    accountId: string;
-    name: string;
-    email: string;
-  };
-}
-
-interface AddProviderRequest {
-  providerType: string;
-  credentials: Credentials;
-}
-
-interface RemoveProviderRequest {
-  providerType: string;
-  instanceIndex: number;
-}
+import { ProviderInfo, AddProviderRequest, RemoveProviderRequest } from '../types.js';
 
 const router = express.Router();
 

@@ -1,44 +1,8 @@
-import CloudProvider, { EnvVariablePatterns, TokenResponse, Credentials, RefreshTokenResult, AccountInfo, FileDownloadResult, MediaInfoResult } from '../cloud-provider.js';
+import CloudProvider from '../cloud-provider.js';
 import { Dropbox, DropboxAuth } from 'dropbox';
 import axios from 'axios';
 import EnvFileManager from '../env-file-manager.js';
-
-interface DropboxFileEntry {
-  '.tag': string;
-  name: string;
-  path_lower: string;
-  path_display: string;
-  id: string;
-  client_modified: string;
-  server_modified: string;
-  rev: string;
-  size: number;
-  content_hash: string;
-}
-
-interface DropboxThumbnailEntry {
-  '.tag': string;
-  metadata: DropboxFileEntry;
-  thumbnail?: string;
-}
-
-interface DropboxSpaceUsage {
-  used: number;
-  allocation: {
-    allocated?: number;
-    team?: {
-      allocated: number;
-    };
-  };
-}
-
-interface DropboxAccount {
-  account_id: string;
-  name: {
-    display_name: string;
-  };
-  email: string;
-}
+import { EnvVariablePatterns, TokenResponse, Credentials, RefreshTokenResult, AccountInfo, FileDownloadResult, MediaInfoResult, DropboxFileEntry, DropboxThumbnailEntry, DropboxSpaceUsage, DropboxAccount } from '../types.js';
 
 class DropboxProvider extends CloudProvider {
   private dbx: Dropbox;

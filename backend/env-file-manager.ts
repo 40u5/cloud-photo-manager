@@ -1,12 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-export interface EditObject {
-  pattern: string;
-  newValue: string;
-  replaceEntireLine?: boolean;
-}
+import { EditObject } from './types.js';
 
 class EnvFileManager {
   private static instance: EnvFileManager;

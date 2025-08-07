@@ -1,15 +1,8 @@
 import DropboxProvider from './providers/dropbox-provider.js';
 import fs from 'fs';
 import EnvFileManager from './env-file-manager.js';
-import CloudProvider, { Credentials } from './cloud-provider.js';
-
-interface ProviderConfigs {
-  [key: string]: number;
-}
-
-interface ProviderInstances {
-  [key: string]: CloudProvider[];
-}
+import CloudProvider from './cloud-provider.js';
+import { Credentials, ProviderConfigs, ProviderInstances } from './types.js';
 
 class CloudProviderManager {
   private static instance: CloudProviderManager;
