@@ -1,28 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Provider, AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusType } from './types';
-import ProviderItem from './components/ProviderItem';
+import { AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusType } from './types';
 import StatusAlert from './components/StatusAlert';
 import ProviderForms from './components/ProviderForms';
+import ProviderList from './components/ProviderList';
 
 function App() {
-  const [providers, setProviders] = useState<Provider[]>([]);
   const [status, setStatus] = useState<{ message: string; type: StatusType } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-
-  const loadProviders = useCallback(async () => {
-    try {
-      const response = await fetch('/provider/providers');
-      if (response.ok) {
-        const providersData = await response.json() as Provider[];
-        setProviders(providersData);
-      } else {
-        console.log('No providers endpoint available or error occurred');
-      }
-    } catch (error) {
-      console.log('Could not load providers:', (error as Error).message);
-    }
-  }, []);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const checkOAuthCallback = useCallback(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -35,20 +20,20 @@ function App() {
         message: 'Authorization successful! Your Dropbox provider has been configured.',
         type: 'success'
       });
-      loadProviders();
+      // Trigger refresh of providers list
+      setRefreshTrigger(prev => prev + 1);
     } else if (error) {
       setStatus({
         message: `Authorization failed: ${error}`,
         type: 'error'
       });
     }
-  }, [loadProviders]);
+  }, []);
 
-  // Load providers on component mount
+  // Check OAuth callback on component mount
   useEffect(() => {
-    loadProviders();
     checkOAuthCallback();
-  }, [loadProviders, checkOAuthCallback]);
+  }, [checkOAuthCallback]);
 
   const handleFormSubmit = async (formData: { appKey: string; appSecret: string }) => {
     if (!formData.appKey || !formData.appSecret) {
@@ -158,7 +143,8 @@ function App() {
         message: 'Provider removed successfully!',
         type: 'success'
       });
-      loadProviders(); // Refresh the providers list
+      // Trigger refresh of providers list
+      setRefreshTrigger(prev => prev + 1);
       
     } catch (error) {
       console.error('Error:', error);
@@ -187,25 +173,11 @@ function App() {
           <ProviderForms onSubmit={handleFormSubmit} isLoading={isLoading} />
 
           {/* Current Providers Section */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-green-500">
-              Current Providers
-            </h2>
-            <div className="space-y-4">
-              {providers.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No providers configured yet.</p>
-              ) : (
-                providers.map(provider => (
-                  <ProviderItem
-                    key={`${provider.type}-${provider.instanceIndex}`}
-                    provider={provider}
-                    onAuthenticate={handleAuthenticateProvider}
-                    onRemove={handleRemoveProvider}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+          <ProviderList
+            onAuthenticate={handleAuthenticateProvider}
+            onRemove={handleRemoveProvider}
+            refreshTrigger={refreshTrigger}
+          />
         </main>
       </div>
     </div>
