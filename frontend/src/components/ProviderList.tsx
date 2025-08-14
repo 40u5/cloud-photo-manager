@@ -99,9 +99,9 @@ function ProviderList({ onAuthenticate, onRemove, refreshTrigger }: ProviderList
         {providers.length === 0 ? (
           <p className="text-gray-500 text-center py-8">No providers configured yet.</p>
         ) : (
-          providers.map(provider => (
+          providers.map((provider, index) => (
             <ProviderItem
-              key={`${provider.type}-${provider.instanceIndex}`}
+              key={`${provider.type}-${index}`}
               provider={provider}
               onAuthenticate={onAuthenticate}
               onRemove={onRemove}
