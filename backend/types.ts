@@ -1,3 +1,5 @@
+import CloudProvider from "./cloud-provider";
+
 // cloud-provider.ts
 export interface EnvVariablePatterns {
   appKey: string;
@@ -46,6 +48,17 @@ export interface MediaInfoResult {
   mediaInfo: any;
 }
 
+export interface PhotoMetadata {
+  id: string;
+  name: string;
+  path: string;
+  date_taken: Date;
+  size: number;
+  providerType: string;
+  instanceIndex: number;
+  hash?: string;
+}
+
 export interface AccountInfo {
   accountId: string;
   name: string;
@@ -84,34 +97,6 @@ export interface RemoveProviderRequest {
 }
 
 // providers/dropbox-provider.ts
-export interface DropboxFileEntry {
-  '.tag': string;
-  name: string;
-  path_lower: string;
-  path_display: string;
-  id: string;
-  client_modified: string;
-  server_modified: string;
-  rev: string;
-  size: number;
-  content_hash: string;
-}
-
-export interface DropboxThumbnailEntry {
-  '.tag': string;
-  metadata: DropboxFileEntry;
-  thumbnail?: string;
-}
-
-export interface DropboxSpaceUsage {
-  used: number;
-  allocation: {
-    allocated?: number;
-    team?: {
-      allocated: number;
-    };
-  };
-}
 
 export interface DropboxAccount {
   account_id: string;
@@ -134,5 +119,12 @@ export interface ProviderConfigs {
 }
 
 export interface ProviderInstances {
-  [key: string]: any[];
+  [key: string]: CloudProvider[];
+}
+
+export interface ThumbnailResponse {
+  success: boolean;
+  data?: Buffer;
+  mimeType?: string;
+  error?: string;
 } 

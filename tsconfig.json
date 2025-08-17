@@ -17,8 +17,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
   "include": [
-    "backend/**/*.ts",
-    "frontend/**/*.ts"
+    "backend/**/*.ts"
   ],
   "exclude": [
     "node_modules",

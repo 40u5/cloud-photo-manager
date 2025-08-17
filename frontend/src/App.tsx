@@ -3,6 +3,7 @@ import { AddProviderRequest, RemoveProviderRequest, AddProviderResponse, StatusT
 import StatusAlert from './components/StatusAlert';
 import ProviderForms from './components/ProviderForms';
 import ProviderList from './components/ProviderList';
+import PhotoGallery from './components/PhotoGallery';
 
 function App() {
   const [status, setStatus] = useState<{ message: string; type: StatusType } | null>(null);
@@ -177,6 +178,12 @@ function App() {
             onAuthenticate={handleAuthenticateProvider}
             onRemove={handleRemoveProvider}
             refreshTrigger={refreshTrigger}
+          />
+
+          {/* Photo Gallery Section */}
+          <PhotoGallery
+            onError={(message) => setStatus({ message, type: 'error' })}
+            onLoading={setIsLoading}
           />
         </main>
       </div>

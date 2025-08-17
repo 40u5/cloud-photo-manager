@@ -29,3 +29,21 @@ export interface Provider {
         email: string;
     };
 }
+
+// PhotoGallery.tsx
+export interface PhotoMetadata {
+    id: string;
+    name: string;
+    path: string;
+    date_taken: Date;
+    size: number;
+    providerType: string;
+    instanceIndex: number;
+    hash?: string;
+    thumbnail?: {
+        data: string;
+        mimeType: string;
+    } | {
+        error: string;
+    };
+}

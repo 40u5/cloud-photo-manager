@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cloudProviderManager from '../cloud-provider-manager.js';
 import { ProviderInfo, AddProviderRequest, RemoveProviderRequest } from '../types.js';
+import { ThumbnailHandler } from '../thumbnail-handler.js';
 
 const router = express.Router();
 
@@ -80,19 +81,6 @@ router.get('/providers', async (req: Request, res: Response) => {
   }
 });
 
-// Provider endpoint to get photos
-router.get('/photos', async (req: Request, res: Response) => {
-  try {
-    // Use the manager to get the first Dropbox provider instance (index 0)
-    const provider = cloudProviderManager.getProvider('DROPBOX', 0);
-    const files = await provider.listFiles('');
-    res.json(files);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
-  }
-});
-
-// Provider endpoint to remove a provider
 router.delete('/remove-provider', async (req: Request, res: Response) => {
   try {
     const { providerType, instanceIndex }: RemoveProviderRequest = req.body;
@@ -119,6 +107,67 @@ router.delete('/remove-provider', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error removing provider:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+router.get('/get-thumbnails', async (req: Request, res: Response) => {
+  try {
+    const { index, size } = req.query;
+    
+    // Validate query parameters
+    if (index === undefined || size === undefined) {
+      return res.status(400).json({ error: 'Missing required query parameters: index and size' });
+    }
+    
+    const indexNum = parseInt(index as string);
+    const sizeNum = parseInt(size as string);
+    
+    // Validate parsed numbers
+    if (isNaN(indexNum) || isNaN(sizeNum)) {
+      return res.status(400).json({ error: 'Index and size must be valid numbers' });
+    }
+    
+    if (indexNum < 0 || sizeNum <= 0) {
+      return res.status(400).json({ error: 'Index must be non-negative and size must be positive' });
+    }
+    
+    console.log(`Getting thumbnails: index=${indexNum}, size=${sizeNum}`);
+    
+    // Check if we have any authenticated providers first
+    const providers: any[] = [];
+    for (const [providerType, instances] of Object.entries(cloudProviderManager.providers)) {
+      for (let i = 0; i < instances.length; i++) {
+        const provider = instances[i];
+        if (provider && provider.isAuthenticated && provider.isAuthenticated()) {
+          providers.push({ type: providerType, instanceIndex: i });
+        }
+      }
+    }
+    
+    if (providers.length === 0) {
+      console.log('No authenticated providers found');
+      return res.json([]); // Return empty array if no providers are authenticated
+    }
+    
+    const thumbnails = await ThumbnailHandler.getThumbnailObjects(indexNum, sizeNum);
+    const enhancedThumbnails = await Promise.all(thumbnails.map(async (thumbnail) => {
+      const provider = cloudProviderManager.getProvider(thumbnail.providerType, thumbnail.instanceIndex);
+      const thumbnailResponse = await provider.getThumbnail(thumbnail.path);
+      return {
+        ...thumbnail,
+        thumbnail: thumbnailResponse.success ? {
+          data: thumbnailResponse.data?.toString('base64'),
+          mimeType: thumbnailResponse.mimeType
+        } : {
+          error: thumbnailResponse.error
+        }
+      };
+    }));
+    
+    res.json(enhancedThumbnails);
+  } catch (error) {
+    console.error('Error getting thumbnails:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error getting thumbnails' });
   }
 });
 

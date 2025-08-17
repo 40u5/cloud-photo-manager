@@ -2,7 +2,9 @@ import CloudProvider from '../cloud-provider.js';
 import { Dropbox, DropboxAuth } from 'dropbox';
 import axios from 'axios';
 import EnvFileManager from '../env-file-manager.js';
-import { EnvVariablePatterns, TokenResponse, Credentials, RefreshTokenResult, AccountInfo, FileDownloadResult, MediaInfoResult, DropboxFileEntry, DropboxThumbnailEntry, DropboxSpaceUsage, DropboxAccount } from '../types.js';
+import { EnvVariablePatterns, TokenResponse, Credentials, RefreshTokenResult,
+   AccountInfo, MediaInfoResult, DropboxAccount, PhotoMetadata, ThumbnailResponse } from '../types.js';
+import { ThumbnailHandler } from '../thumbnail-handler.js';
 
 class DropboxProvider extends CloudProvider {
   private dbx: Dropbox;
@@ -216,7 +218,7 @@ class DropboxProvider extends CloudProvider {
   async getStorage(): Promise<number> {
     try {
       const res = await this.dbx.usersGetSpaceUsage();
-      const result = res.result as DropboxSpaceUsage;
+      const result = res.result as any;
       const used = result.used;
       const allocation = result.allocation;
       let allocated = 0;
@@ -231,7 +233,7 @@ class DropboxProvider extends CloudProvider {
     }
   }
 
-  async listFiles(folderPath: string = '', recursive: boolean = false, limit: number = 2000): Promise<DropboxFileEntry[]> {
+  async listFiles(folderPath: string = '', recursive: boolean = false, limit: number = 2000, instanceIndex: number = 0): Promise<PhotoMetadata[]> {
     try {
       const params = {
         path: folderPath === '' ? '' : folderPath,
@@ -244,7 +246,7 @@ class DropboxProvider extends CloudProvider {
       };
 
       const res = await this.dbx.filesListFolder(params);
-      let entries = res.result.entries as DropboxFileEntry[];
+      let entries = res.result.entries as any[];
 
       // Handle pagination if there are more files
       let hasMore = res.result.has_more;
@@ -252,78 +254,21 @@ class DropboxProvider extends CloudProvider {
 
       while (hasMore) {
         const moreRes = await this.dbx.filesListFolderContinue({ cursor: cursor });
-        entries = entries.concat(moreRes.result.entries as DropboxFileEntry[]);
+        entries = entries.concat(moreRes.result.entries as any[]);
         hasMore = moreRes.result.has_more;
         cursor = moreRes.result.cursor;
       }
 
-      return entries;
+      const photoMetadata: PhotoMetadata[] = [];
+      for (const entry of entries) {
+        photoMetadata.push(await ThumbnailHandler.convertToPhotoMetadata(entry.id,
+           entry.name, entry.path_display, new Date(entry.client_modified), entry.size,
+            this.getProviderType(), instanceIndex, entry.content_hash));
+      }
+
+      return photoMetadata;
     } catch (err) {
       throw new Error('Failed to list files from Dropbox: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    }
-  }
-
-  async getThumbnails(filePaths: string[], size: string = 'w64h64', format: string = 'jpeg'): Promise<DropboxThumbnailEntry[]> {
-    try {
-      if (!Array.isArray(filePaths) || filePaths.length === 0) {
-        throw new Error('filePaths must be a non-empty array');
-      }
-
-      // Dropbox supports up to 25 files per batch request
-      const maxBatchSize = 25;
-      const batches: string[][] = [];
-      
-      for (let i = 0; i < filePaths.length; i += maxBatchSize) {
-        batches.push(filePaths.slice(i, i + maxBatchSize));
-      }
-
-      const allThumbnails: DropboxThumbnailEntry[] = [];
-
-      for (const batch of batches) {
-        const entries = batch.map(path => ({
-          path: path,
-          format: format as any,
-          size: size as any
-        }));
-
-        const res = await this.dbx.filesGetThumbnailBatch({ entries: entries as any });
-        allThumbnails.push(...res.result.entries as DropboxThumbnailEntry[]);
-      }
-      return allThumbnails;
-      
-    } catch (err) {
-      throw new Error('Failed to get thumbnails batch from Dropbox: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    }
-  }
-
-  async getFile(filePath: string, options: { rev?: string } = {}): Promise<FileDownloadResult> {
-    try {
-      const params: { path: string; rev?: string } = {
-        path: filePath
-      };
-
-      // Add optional parameters if provided
-      if (options.rev) params.rev = options.rev;
-
-      const res = await this.dbx.filesDownload(params);
-      
-      return {
-        metadata: {
-          name: res.result.name,
-          path_lower: res.result.path_lower || '',
-          path_display: res.result.path_display || '',
-          id: res.result.id,
-          client_modified: res.result.client_modified,
-          server_modified: res.result.server_modified,
-          rev: res.result.rev,
-          size: res.result.size,
-          content_hash: res.result.content_hash || ''
-        },
-        fileBinary: (res.result as any).fileBinary,
-        fileBlob: (res.result as any).fileBlob
-      };
-    } catch (err) {
-      throw new Error('Failed to download file from Dropbox: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   }
 
@@ -354,6 +299,90 @@ class DropboxProvider extends CloudProvider {
       };
     } catch (err) {
       throw new Error('Failed to get Dropbox account info: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }
+
+  /**
+   * Get a thumbnail for a file from Dropbox
+   * @param filePath - The path to the file
+   * @param size - The thumbnail size ('small', 'medium', 'large', 'xl')
+   * @returns Promise containing thumbnail data or error
+   */
+  async getThumbnail(filePath: string): Promise<ThumbnailResponse> {
+    try {
+      if (!this.authenticated) {
+        return {
+          success: false,
+          error: 'Provider not authenticated'
+        };
+      }
+
+      // Get thumbnail using Dropbox API
+      const response = await this.dbx.filesGetThumbnailV2({
+        resource: {
+          '.tag': 'path',
+          path: filePath
+        },
+        format: {
+          '.tag': 'jpeg'
+        },
+        size: {
+          '.tag': 'w256h256'
+        },
+        mode: {
+          '.tag': 'strict'
+        }
+      });
+
+      // Extract the thumbnail data from the response
+      const thumbnailBlob = (response.result as any).fileBinary;
+      
+      if (!thumbnailBlob) {
+        return {
+          success: false,
+          error: 'No thumbnail data received from Dropbox'
+        };
+      }
+
+      // Convert to Buffer if it's not already
+      let thumbnailBuffer: Buffer;
+      if (Buffer.isBuffer(thumbnailBlob)) {
+        thumbnailBuffer = thumbnailBlob;
+      } else if (thumbnailBlob instanceof ArrayBuffer) {
+        thumbnailBuffer = Buffer.from(thumbnailBlob);
+      } else if (thumbnailBlob instanceof Uint8Array) {
+        thumbnailBuffer = Buffer.from(thumbnailBlob);
+      } else {
+        // Try to convert from blob-like object
+        thumbnailBuffer = Buffer.from(await thumbnailBlob.arrayBuffer());
+      }
+
+      return {
+        success: true,
+        data: thumbnailBuffer,
+        mimeType: 'image/jpeg'
+      };
+
+    } catch (err) {
+      console.error('Failed to get thumbnail from Dropbox:', err);
+      
+      let errorMessage = 'Failed to get thumbnail';
+      if (err instanceof Error) {
+        if (err.message.includes('not_found')) {
+          errorMessage = 'File not found';
+        } else if (err.message.includes('unsupported_file')) {
+          errorMessage = 'Thumbnail not available for this file type';
+        } else if (err.message.includes('conversion_error')) {
+          errorMessage = 'Failed to generate thumbnail for this file';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
     }
   }
 }

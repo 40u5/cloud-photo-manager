@@ -3,11 +3,13 @@ import fs from 'fs';
 import EnvFileManager from './env-file-manager.js';
 import CloudProvider from './cloud-provider.js';
 import { Credentials, ProviderConfigs, ProviderInstances } from './types.js';
+import { ThumbnailHandler } from './thumbnail-handler.js';
 
 class CloudProviderManager {
   private static instance: CloudProviderManager;
   public providers: ProviderInstances = {};
   private isInitialized: boolean = false;
+  private thumbnailHandler!: ThumbnailHandler;
 
   constructor() {
     if (CloudProviderManager.instance) {
@@ -66,7 +68,7 @@ class CloudProviderManager {
     }
     
     // Initialize providers for each type from index 0 to max index
-    for (const [providerType, maxIndex] of Object.entries(providerConfigs)) {
+    for (const [providerType, maxIndex] of Object.entries(providerConfigs) as [string, number][]) {
       // Initialize providers from index 0 to maxIndex
       for (let i = 0; i <= maxIndex; i++) {
         try {
@@ -113,8 +115,9 @@ class CloudProviderManager {
       
       if (!authenticated) {
         console.log(`Failed to authenticate ${providerType} provider at index ${actualIndex}`);
+      } else {
+        ThumbnailHandler.addThumbnails(await provider.listFiles('', false, 2000, actualIndex));
       }
-      
       console.log(`Provider instance (${providerType}) added successfully at index ${actualIndex}`);
       console.log(`Current providers for ${providerType}:`, this.providers[providerType].map((p, i) => p ? `index ${i}: exists` : `index ${i}: null`));
       return provider;
@@ -362,13 +365,17 @@ class CloudProviderManager {
 
     // Remove the instance from the providers array
     providerInstances.splice(instanceIndex, 1);
+    ThumbnailHandler.removeProvider(providerType, instanceIndex);
     
     // Remove environment variables for the removed instance
     this.removeInstanceEnvVariable(providerType, instanceIndex);
             
     console.log(`Provider instance ${instanceIndex} (${providerType}) removed successfully`);
   }
+
 }
+
+
 
 // Export a singleton instance
 const cloudProviderManager = new CloudProviderManager();

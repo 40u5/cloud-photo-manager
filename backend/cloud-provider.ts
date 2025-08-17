@@ -1,4 +1,4 @@
-import { EnvVariablePatterns, TokenResponse, Credentials, StorageInfo, FileMetadata, FileDownloadResult, MediaInfoResult, AccountInfo, RefreshTokenResult } from './types.js';
+import { EnvVariablePatterns, TokenResponse, Credentials, StorageInfo, FileMetadata, FileDownloadResult, MediaInfoResult, AccountInfo, RefreshTokenResult, PhotoMetadata, ThumbnailResponse } from './types.js';
 
 export default class CloudProvider {
   constructor() {
@@ -70,11 +70,21 @@ export default class CloudProvider {
     throw new Error("getAccountInfo Not Implemented In Subclass")
   }
 
-  async listFiles(folderPath?: string, recursive?: boolean, limit?: number): Promise<any[]> {
+  async listFiles(folderPath?: string, recursive?: boolean, limit?: number, instanceIndex?: number): Promise<PhotoMetadata[]> {
     throw new Error("listFiles Not Implemented In Subclass")
   }
 
   async refreshToken(credentials: Credentials, instanceIndex: number): Promise<RefreshTokenResult> {
     throw new Error("refreshToken Not Implemented In Subclass")
+  }
+
+  /**
+   * Get a thumbnail for a file
+   * @param filePath - The path to the file
+   * @param size - The thumbnail size (optional, defaults to medium)
+   * @returns Promise containing thumbnail data or error
+   */
+  async getThumbnail(filePath: string, size?: string): Promise<ThumbnailResponse> {
+    throw new Error("getThumbnail Not Implemented In Subclass");
   }
 } 
